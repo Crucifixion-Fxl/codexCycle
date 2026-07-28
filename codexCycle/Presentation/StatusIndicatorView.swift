@@ -7,14 +7,11 @@ enum StatusIndicatorMetrics {
     static let glassInset: CGFloat = 1.5
 
     static func ringRect(in bounds: NSRect) -> NSRect {
-        bounds.insetBy(
-            dx: ringLineWidth / 2,
-            dy: ringLineWidth / 2
-        )
+        safeInset(bounds, by: ringLineWidth / 2)
     }
 
     static func glassRect(in bounds: NSRect) -> NSRect {
-        bounds.insetBy(dx: glassInset, dy: glassInset)
+        safeInset(bounds, by: glassInset)
     }
 
     static func fontSize(forCharacterCount count: Int) -> CGFloat {
@@ -26,6 +23,28 @@ enum StatusIndicatorMetrics {
         default:
             10.6
         }
+    }
+
+    private static func safeInset(_ bounds: NSRect, by inset: CGFloat) -> NSRect {
+        guard
+            bounds.origin.x.isFinite,
+            bounds.origin.y.isFinite,
+            bounds.width.isFinite,
+            bounds.height.isFinite
+        else {
+            return .zero
+        }
+
+        guard bounds.width > inset * 2, bounds.height > inset * 2 else {
+            return NSRect(
+                x: bounds.midX,
+                y: bounds.midY,
+                width: 0,
+                height: 0
+            )
+        }
+
+        return bounds.insetBy(dx: inset, dy: inset)
     }
 }
 
@@ -198,6 +217,13 @@ final class StatusIndicatorView: NSView {
     }
 
     fileprivate func drawIndicator() {
+        guard
+            bounds.width > StatusIndicatorMetrics.ringLineWidth,
+            bounds.height > StatusIndicatorMetrics.ringLineWidth
+        else {
+            return
+        }
+
         if usesSolidAccessibilityFace {
             drawSolidGlassFallback()
         } else if #unavailable(macOS 26.0) {
@@ -245,10 +271,12 @@ final class StatusIndicatorView: NSView {
             let upper = normalized * Double(index + 1) / Double(segmentCount)
             let midpointPercent = ((lower + upper) / 2) * 100
             let components = UsageGradient.color(at: midpointPercent)
+            let startPoint = geometry.point(at: lower)
+            let endPoint = geometry.point(at: upper)
 
             let path = NSBezierPath()
-            path.move(to: geometry.point(at: lower))
-            path.line(to: geometry.point(at: upper))
+            path.move(to: startPoint)
+            path.line(to: endPoint)
             path.lineWidth = StatusIndicatorMetrics.ringLineWidth
             path.lineCapStyle = .round
 
