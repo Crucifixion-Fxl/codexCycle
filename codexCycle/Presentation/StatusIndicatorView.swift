@@ -1,5 +1,30 @@
 import AppKit
 
+enum StatusIndicatorMetrics {
+    static let ringLineWidth: CGFloat = 2.2
+    static let trackLineWidth: CGFloat = 2
+    static let glassInset: CGFloat = 1.5
+
+    static func ringRadius(for minimumDimension: CGFloat) -> CGFloat {
+        max(0, (minimumDimension - ringLineWidth) / 2)
+    }
+
+    static func glassDiameter(for minimumDimension: CGFloat) -> CGFloat {
+        max(0, minimumDimension - glassInset * 2)
+    }
+
+    static func fontSize(forCharacterCount count: Int) -> CGFloat {
+        switch count {
+        case 1:
+            11
+        case 2:
+            10
+        default:
+            8.6
+        }
+    }
+}
+
 final class StatusIndicatorView: NSView {
     private let glassContainer = NSView()
     private let overlayView = IndicatorOverlayView()
@@ -44,7 +69,9 @@ final class StatusIndicatorView: NSView {
 
     override func layout() {
         super.layout()
-        let diameter = min(bounds.width, bounds.height) - 4
+        let diameter = StatusIndicatorMetrics.glassDiameter(
+            for: min(bounds.width, bounds.height)
+        )
         let frame = NSRect(
             x: bounds.midX - diameter / 2,
             y: bounds.midY - diameter / 2,
@@ -119,11 +146,12 @@ final class StatusIndicatorView: NSView {
         drawValue()
     }
 
-    private func circleGeometry(inset: CGFloat = 1.5) -> (center: NSPoint, radius: CGFloat) {
-        let diameter = min(bounds.width, bounds.height) - inset * 2
+    private func circleGeometry() -> (center: NSPoint, radius: CGFloat) {
         return (
             NSPoint(x: bounds.midX, y: bounds.midY),
-            max(0, diameter / 2)
+            StatusIndicatorMetrics.ringRadius(
+                for: min(bounds.width, bounds.height)
+            )
         )
     }
 
@@ -136,7 +164,7 @@ final class StatusIndicatorView: NSView {
             startAngle: 0,
             endAngle: 360
         )
-        path.lineWidth = 1.8
+        path.lineWidth = StatusIndicatorMetrics.trackLineWidth
         NSColor.labelColor.withAlphaComponent(0.14).setStroke()
         path.stroke()
     }
@@ -164,7 +192,7 @@ final class StatusIndicatorView: NSView {
                 endAngle: 90 - 360 * upper,
                 clockwise: true
             )
-            path.lineWidth = 2
+            path.lineWidth = StatusIndicatorMetrics.ringLineWidth
             path.lineCapStyle = .round
 
             let color: NSColor
@@ -185,15 +213,9 @@ final class StatusIndicatorView: NSView {
 
     private func drawValue() {
         let text = remainingPercent.map(String.init) ?? "—"
-        let fontSize: CGFloat
-        switch text.count {
-        case 1:
-            fontSize = 9
-        case 2:
-            fontSize = 8
-        default:
-            fontSize = 6.6
-        }
+        let fontSize = StatusIndicatorMetrics.fontSize(
+            forCharacterCount: text.count
+        )
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -215,7 +237,9 @@ final class StatusIndicatorView: NSView {
     }
 
     private func drawSolidGlassFallback() {
-        let diameter = min(bounds.width, bounds.height) - 5
+        let diameter = StatusIndicatorMetrics.glassDiameter(
+            for: min(bounds.width, bounds.height)
+        )
         let rect = NSRect(
             x: bounds.midX - diameter / 2,
             y: bounds.midY - diameter / 2,
@@ -229,7 +253,9 @@ final class StatusIndicatorView: NSView {
     }
 
     private func drawGlassHighlight() {
-        let diameter = min(bounds.width, bounds.height) - 5
+        let diameter = StatusIndicatorMetrics.glassDiameter(
+            for: min(bounds.width, bounds.height)
+        )
         let rect = NSRect(
             x: bounds.midX - diameter / 2,
             y: bounds.midY - diameter / 2,

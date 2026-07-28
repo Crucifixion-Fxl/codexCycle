@@ -32,4 +32,28 @@ final class InfrastructureTests: XCTestCase {
         )
         XCTAssertEqual(DisplayErrorReason.classify(AppServerClientError.timedOut), .networkFailure)
     }
+
+    func testStatusIndicatorFillsAvailableHeightAndUsesLargerDigits() {
+        let minimumDimension: CGFloat = 22
+        let outerRadius = StatusIndicatorMetrics.ringRadius(
+            for: minimumDimension
+        ) + StatusIndicatorMetrics.ringLineWidth / 2
+
+        XCTAssertEqual(outerRadius, minimumDimension / 2, accuracy: 0.001)
+        XCTAssertEqual(
+            StatusIndicatorMetrics.fontSize(forCharacterCount: 1),
+            11,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            StatusIndicatorMetrics.fontSize(forCharacterCount: 2),
+            10,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            StatusIndicatorMetrics.fontSize(forCharacterCount: 3),
+            8.6,
+            accuracy: 0.001
+        )
+    }
 }
