@@ -34,7 +34,7 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(DisplayErrorReason.classify(AppServerClientError.timedOut), .networkFailure)
     }
 
-    func testStatusIndicatorUsesExpandedCapsuleAndLargerDigits() {
+    func testStatusIndicatorUsesInsetCapsuleAndTunedDigits() {
         let bounds = NSRect(
             x: 0,
             y: 0,
@@ -45,27 +45,27 @@ final class InfrastructureTests: XCTestCase {
 
         XCTAssertEqual(
             ringRect.width + StatusIndicatorMetrics.ringLineWidth,
-            StatusIndicatorMetrics.statusItemWidth,
+            StatusIndicatorMetrics.statusItemWidth - 1,
             accuracy: 0.001
         )
         XCTAssertEqual(
             ringRect.height + StatusIndicatorMetrics.ringLineWidth,
-            bounds.height,
+            bounds.height - 1,
             accuracy: 0.001
         )
         XCTAssertEqual(
             StatusIndicatorMetrics.fontSize(forCharacterCount: 1),
-            13,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            StatusIndicatorMetrics.fontSize(forCharacterCount: 2),
             12,
             accuracy: 0.001
         )
         XCTAssertEqual(
+            StatusIndicatorMetrics.fontSize(forCharacterCount: 2),
+            11,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
             StatusIndicatorMetrics.fontSize(forCharacterCount: 3),
-            10.6,
+            9.6,
             accuracy: 0.001
         )
     }
@@ -105,7 +105,7 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
-    func testStatusIndicatorRendersExpandedCapsule() throws {
+    func testStatusIndicatorRendersTunedCapsule() throws {
         let view = StatusIndicatorView(
             frame: NSRect(
                 x: 0,
@@ -131,7 +131,7 @@ final class InfrastructureTests: XCTestCase {
             data: pngData,
             uniformTypeIdentifier: "public.png"
         )
-        attachment.name = "Expanded quota indicator"
+        attachment.name = "Tuned quota indicator"
         attachment.lifetime = .keepAlways
         add(attachment)
     }
