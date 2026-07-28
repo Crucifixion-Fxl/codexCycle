@@ -136,4 +136,16 @@ final class InfrastructureTests: XCTestCase {
         add(attachment)
     }
 
+    @MainActor
+    func testStatusItemBecomesVisibleAfterAppKitLayout() {
+        let controller = StatusMenuController()
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let snapshot = controller.layoutSnapshot
+
+        XCTAssertGreaterThan(snapshot.buttonBounds.height, 0)
+        XCTAssertGreaterThan(snapshot.indicatorBounds.height, 0)
+        XCTAssertTrue(snapshot.isAttachedToWindow)
+    }
+
 }
