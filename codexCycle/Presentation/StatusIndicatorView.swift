@@ -4,10 +4,11 @@ enum StatusIndicatorMetrics {
     static let statusItemWidth: CGFloat = 34
     static let ringLineWidth: CGFloat = 2.2
     static let trackLineWidth: CGFloat = 2
-    static let glassInset: CGFloat = 1.5
+    static let ringInset: CGFloat = 0.5
+    static let glassInset: CGFloat = 2
 
     static func ringRect(in bounds: NSRect) -> NSRect {
-        safeInset(bounds, by: ringLineWidth / 2)
+        safeInset(bounds, by: ringLineWidth / 2 + ringInset)
     }
 
     static func glassRect(in bounds: NSRect) -> NSRect {
@@ -17,11 +18,11 @@ enum StatusIndicatorMetrics {
     static func fontSize(forCharacterCount count: Int) -> CGFloat {
         switch count {
         case 1:
-            13
-        case 2:
             12
+        case 2:
+            11
         default:
-            10.6
+            9.6
         }
     }
 
