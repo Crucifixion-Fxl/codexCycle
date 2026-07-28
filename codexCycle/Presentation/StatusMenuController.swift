@@ -33,6 +33,12 @@ enum UsageDisplayState: Equatable {
     }
 }
 
+struct StatusItemLayoutSnapshot {
+    let buttonBounds: NSRect
+    let indicatorBounds: NSRect
+    let isAttachedToWindow: Bool
+}
+
 final class StatusMenuController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let indicatorView: StatusIndicatorView
@@ -52,6 +58,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     var onRefresh: (() -> Void)?
     var onOpenLoginSettings: (() -> Void)?
+
+    var layoutSnapshot: StatusItemLayoutSnapshot {
+        StatusItemLayoutSnapshot(
+            buttonBounds: statusItem.button?.bounds ?? .zero,
+            indicatorBounds: indicatorView.bounds,
+            isAttachedToWindow: statusItem.button?.window != nil
+        )
+    }
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(
@@ -107,7 +121,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private func configureStatusItem() {
         guard let button = statusItem.button else { return }
         button.title = ""
-        button.image = nil
+        button.image = NSImage(
+            size: NSSize(
+                width: StatusIndicatorMetrics.statusItemWidth,
+                height: 22
+            )
+        )
+        button.imagePosition = .imageOnly
         indicatorView.frame = button.bounds
         indicatorView.autoresizingMask = [.width, .height]
         button.addSubview(indicatorView)
