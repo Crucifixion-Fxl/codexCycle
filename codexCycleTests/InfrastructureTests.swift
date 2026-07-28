@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import codexCycle
 
@@ -33,27 +34,89 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(DisplayErrorReason.classify(AppServerClientError.timedOut), .networkFailure)
     }
 
-    func testStatusIndicatorFillsAvailableHeightAndUsesLargerDigits() {
-        let minimumDimension: CGFloat = 22
-        let outerRadius = StatusIndicatorMetrics.ringRadius(
-            for: minimumDimension
-        ) + StatusIndicatorMetrics.ringLineWidth / 2
+    func testStatusIndicatorUsesExpandedCapsuleAndLargerDigits() {
+        let bounds = NSRect(
+            x: 0,
+            y: 0,
+            width: StatusIndicatorMetrics.statusItemWidth,
+            height: 22
+        )
+        let ringRect = StatusIndicatorMetrics.ringRect(in: bounds)
 
-        XCTAssertEqual(outerRadius, minimumDimension / 2, accuracy: 0.001)
+        XCTAssertEqual(
+            ringRect.width + StatusIndicatorMetrics.ringLineWidth,
+            StatusIndicatorMetrics.statusItemWidth,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ringRect.height + StatusIndicatorMetrics.ringLineWidth,
+            bounds.height,
+            accuracy: 0.001
+        )
         XCTAssertEqual(
             StatusIndicatorMetrics.fontSize(forCharacterCount: 1),
-            11,
+            13,
             accuracy: 0.001
         )
         XCTAssertEqual(
             StatusIndicatorMetrics.fontSize(forCharacterCount: 2),
-            10,
+            12,
             accuracy: 0.001
         )
         XCTAssertEqual(
             StatusIndicatorMetrics.fontSize(forCharacterCount: 3),
-            8.6,
+            10.6,
             accuracy: 0.001
         )
+    }
+
+    func testCapsuleProgressPathClosesAtTopCenter() {
+        let bounds = NSRect(x: 0, y: 0, width: 34, height: 22)
+        let geometry = CapsuleRingGeometry(
+            rect: StatusIndicatorMetrics.ringRect(in: bounds)
+        )
+
+        let start = geometry.point(at: 0)
+        let halfway = geometry.point(at: 0.5)
+        let end = geometry.point(at: 1)
+
+        XCTAssertEqual(start.x, bounds.midX, accuracy: 0.001)
+        XCTAssertEqual(start.y, geometry.rect.maxY, accuracy: 0.001)
+        XCTAssertEqual(halfway.x, bounds.midX, accuracy: 0.001)
+        XCTAssertEqual(halfway.y, geometry.rect.minY, accuracy: 0.001)
+        XCTAssertEqual(end.x, start.x, accuracy: 0.001)
+        XCTAssertEqual(end.y, start.y, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testStatusIndicatorRendersExpandedCapsule() throws {
+        let view = StatusIndicatorView(
+            frame: NSRect(
+                x: 0,
+                y: 0,
+                width: StatusIndicatorMetrics.statusItemWidth,
+                height: 22
+            )
+        )
+        view.remainingPercent = 96
+        view.isStale = false
+        view.layoutSubtreeIfNeeded()
+
+        let representation = try XCTUnwrap(
+            view.bitmapImageRepForCachingDisplay(in: view.bounds)
+        )
+        view.cacheDisplay(in: view.bounds, to: representation)
+        let pngData = try XCTUnwrap(
+            representation.representation(using: .png, properties: [:])
+        )
+
+        XCTAssertGreaterThan(pngData.count, 0)
+        let attachment = XCTAttachment(
+            data: pngData,
+            uniformTypeIdentifier: "public.png"
+        )
+        attachment.name = "Expanded quota indicator"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

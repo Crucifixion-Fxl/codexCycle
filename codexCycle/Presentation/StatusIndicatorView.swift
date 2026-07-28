@@ -1,27 +1,94 @@
 import AppKit
 
 enum StatusIndicatorMetrics {
+    static let statusItemWidth: CGFloat = 34
     static let ringLineWidth: CGFloat = 2.2
     static let trackLineWidth: CGFloat = 2
     static let glassInset: CGFloat = 1.5
 
-    static func ringRadius(for minimumDimension: CGFloat) -> CGFloat {
-        max(0, (minimumDimension - ringLineWidth) / 2)
+    static func ringRect(in bounds: NSRect) -> NSRect {
+        bounds.insetBy(
+            dx: ringLineWidth / 2,
+            dy: ringLineWidth / 2
+        )
     }
 
-    static func glassDiameter(for minimumDimension: CGFloat) -> CGFloat {
-        max(0, minimumDimension - glassInset * 2)
+    static func glassRect(in bounds: NSRect) -> NSRect {
+        bounds.insetBy(dx: glassInset, dy: glassInset)
     }
 
     static func fontSize(forCharacterCount count: Int) -> CGFloat {
         switch count {
         case 1:
-            11
+            13
         case 2:
-            10
+            12
         default:
-            8.6
+            10.6
         }
+    }
+}
+
+struct CapsuleRingGeometry {
+    let rect: NSRect
+
+    private var radius: CGFloat {
+        max(0, min(rect.width, rect.height) / 2)
+    }
+
+    private var straightLength: CGFloat {
+        max(0, rect.width - radius * 2)
+    }
+
+    var perimeter: CGFloat {
+        straightLength * 2 + 2 * .pi * radius
+    }
+
+    func point(at fraction: Double) -> NSPoint {
+        guard perimeter > 0 else {
+            return NSPoint(x: rect.midX, y: rect.midY)
+        }
+
+        let progress = min(1, max(0, fraction))
+        var distance = CGFloat(progress) * perimeter
+        let halfStraight = straightLength / 2
+
+        if distance <= halfStraight {
+            return NSPoint(x: rect.midX + distance, y: rect.maxY)
+        }
+        distance -= halfStraight
+
+        let arcLength = .pi * radius
+        if distance <= arcLength {
+            let angle = .pi / 2 - distance / radius
+            return NSPoint(
+                x: rect.maxX - radius + cos(angle) * radius,
+                y: rect.midY + sin(angle) * radius
+            )
+        }
+        distance -= arcLength
+
+        if distance <= straightLength {
+            return NSPoint(
+                x: rect.maxX - radius - distance,
+                y: rect.minY
+            )
+        }
+        distance -= straightLength
+
+        if distance <= arcLength {
+            let angle = -.pi / 2 - distance / radius
+            return NSPoint(
+                x: rect.minX + radius + cos(angle) * radius,
+                y: rect.midY + sin(angle) * radius
+            )
+        }
+        distance -= arcLength
+
+        return NSPoint(
+            x: min(rect.midX, rect.minX + radius + distance),
+            y: rect.maxY
+        )
     }
 }
 
@@ -69,18 +136,14 @@ final class StatusIndicatorView: NSView {
 
     override func layout() {
         super.layout()
-        let diameter = StatusIndicatorMetrics.glassDiameter(
-            for: min(bounds.width, bounds.height)
-        )
-        let frame = NSRect(
-            x: bounds.midX - diameter / 2,
-            y: bounds.midY - diameter / 2,
-            width: diameter,
-            height: diameter
-        )
-        glassContainer.frame = frame
+        glassContainer.frame = StatusIndicatorMetrics.glassRect(in: bounds)
         nativeGlassView?.frame = glassContainer.bounds
-        nativeGlassView?.layer?.cornerRadius = diameter / 2
+        let cornerRadius = glassContainer.bounds.height / 2
+        nativeGlassView?.layer?.cornerRadius = cornerRadius
+        if #available(macOS 26.0, *),
+           let glass = nativeGlassView as? NSGlassEffectView {
+            glass.cornerRadius = cornerRadius
+        }
         overlayView.frame = bounds
     }
 
@@ -113,7 +176,7 @@ final class StatusIndicatorView: NSView {
         if #available(macOS 26.0, *) {
             let glass = NSGlassEffectView(frame: glassContainer.bounds)
             glass.style = .clear
-            glass.cornerRadius = glassContainer.bounds.width / 2
+            glass.cornerRadius = glassContainer.bounds.height / 2
             glass.tintColor = NSColor.white.withAlphaComponent(0.04)
             glass.autoresizingMask = [.width, .height]
             glassContainer.addSubview(glass)
@@ -124,7 +187,7 @@ final class StatusIndicatorView: NSView {
             effect.blendingMode = .withinWindow
             effect.state = .active
             effect.wantsLayer = true
-            effect.layer?.cornerRadius = glassContainer.bounds.width / 2
+            effect.layer?.cornerRadius = glassContainer.bounds.height / 2
             effect.layer?.masksToBounds = true
             effect.autoresizingMask = [.width, .height]
             glassContainer.addSubview(effect)
@@ -146,23 +209,17 @@ final class StatusIndicatorView: NSView {
         drawValue()
     }
 
-    private func circleGeometry() -> (center: NSPoint, radius: CGFloat) {
-        return (
-            NSPoint(x: bounds.midX, y: bounds.midY),
-            StatusIndicatorMetrics.ringRadius(
-                for: min(bounds.width, bounds.height)
-            )
+    private func capsulePath(in rect: NSRect) -> NSBezierPath {
+        NSBezierPath(
+            roundedRect: rect,
+            xRadius: rect.height / 2,
+            yRadius: rect.height / 2
         )
     }
 
     private func drawTrack() {
-        let geometry = circleGeometry()
-        let path = NSBezierPath()
-        path.appendArc(
-            withCenter: geometry.center,
-            radius: geometry.radius,
-            startAngle: 0,
-            endAngle: 360
+        let path = capsulePath(
+            in: StatusIndicatorMetrics.ringRect(in: bounds)
         )
         path.lineWidth = StatusIndicatorMetrics.trackLineWidth
         NSColor.labelColor.withAlphaComponent(0.14).setStroke()
@@ -174,9 +231,14 @@ final class StatusIndicatorView: NSView {
             return
         }
 
-        let geometry = circleGeometry()
+        let geometry = CapsuleRingGeometry(
+            rect: StatusIndicatorMetrics.ringRect(in: bounds)
+        )
         let normalized = min(1, max(0, Double(remainingPercent) / 100))
-        let segmentCount = max(1, Int(ceil(normalized * 120)))
+        let segmentCount = max(
+            1,
+            Int(ceil(normalized * Double(geometry.perimeter * 2)))
+        )
 
         for index in 0..<segmentCount {
             let lower = normalized * Double(index) / Double(segmentCount)
@@ -185,13 +247,8 @@ final class StatusIndicatorView: NSView {
             let components = UsageGradient.color(at: midpointPercent)
 
             let path = NSBezierPath()
-            path.appendArc(
-                withCenter: geometry.center,
-                radius: geometry.radius,
-                startAngle: 90 - 360 * lower,
-                endAngle: 90 - 360 * upper,
-                clockwise: true
-            )
+            path.move(to: geometry.point(at: lower))
+            path.line(to: geometry.point(at: upper))
             path.lineWidth = StatusIndicatorMetrics.ringLineWidth
             path.lineCapStyle = .round
 
@@ -237,38 +294,29 @@ final class StatusIndicatorView: NSView {
     }
 
     private func drawSolidGlassFallback() {
-        let diameter = StatusIndicatorMetrics.glassDiameter(
-            for: min(bounds.width, bounds.height)
-        )
-        let rect = NSRect(
-            x: bounds.midX - diameter / 2,
-            y: bounds.midY - diameter / 2,
-            width: diameter,
-            height: diameter
-        )
+        let rect = StatusIndicatorMetrics.glassRect(in: bounds)
+        let path = capsulePath(in: rect)
         NSColor.windowBackgroundColor.setFill()
-        NSBezierPath(ovalIn: rect).fill()
+        path.fill()
         NSColor.labelColor.withAlphaComponent(0.35).setStroke()
-        NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).stroke()
+        capsulePath(in: rect.insetBy(dx: 0.5, dy: 0.5)).stroke()
     }
 
     private func drawGlassHighlight() {
-        let diameter = StatusIndicatorMetrics.glassDiameter(
-            for: min(bounds.width, bounds.height)
-        )
-        let rect = NSRect(
-            x: bounds.midX - diameter / 2,
-            y: bounds.midY - diameter / 2,
-            width: diameter,
-            height: diameter
-        )
+        let rect = StatusIndicatorMetrics.glassRect(in: bounds)
         NSColor.white.withAlphaComponent(0.28).setStroke()
         let highlight = NSBezierPath()
-        highlight.appendArc(
-            withCenter: NSPoint(x: rect.midX, y: rect.midY),
-            radius: diameter / 2 - 0.5,
-            startAngle: 35,
-            endAngle: 145
+        highlight.move(
+            to: NSPoint(
+                x: rect.minX + rect.height / 2,
+                y: rect.maxY - 0.5
+            )
+        )
+        highlight.line(
+            to: NSPoint(
+                x: rect.maxX - rect.height / 2,
+                y: rect.maxY - 0.5
+            )
         )
         highlight.lineWidth = 0.7
         highlight.stroke()
