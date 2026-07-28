@@ -54,8 +54,17 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var onOpenLoginSettings: (() -> Void)?
 
     override init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: 26)
-        indicatorView = StatusIndicatorView(frame: NSRect(x: 0, y: 0, width: 26, height: 22))
+        statusItem = NSStatusBar.system.statusItem(
+            withLength: StatusIndicatorMetrics.statusItemWidth
+        )
+        indicatorView = StatusIndicatorView(
+            frame: NSRect(
+                x: 0,
+                y: 0,
+                width: StatusIndicatorMetrics.statusItemWidth,
+                height: 22
+            )
+        )
         super.init()
 
         configureStatusItem()
