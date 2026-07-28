@@ -88,6 +88,22 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(end.y, start.y, accuracy: 0.001)
     }
 
+    func testStatusIndicatorUsesFiniteEmptyRectsBeforeStatusBarLayout() {
+        let transientBounds = NSRect(x: 0, y: 0, width: 34, height: 0)
+
+        for rect in [
+            StatusIndicatorMetrics.ringRect(in: transientBounds),
+            StatusIndicatorMetrics.glassRect(in: transientBounds)
+        ] {
+            XCTAssertTrue(rect.origin.x.isFinite)
+            XCTAssertTrue(rect.origin.y.isFinite)
+            XCTAssertTrue(rect.width.isFinite)
+            XCTAssertTrue(rect.height.isFinite)
+            XCTAssertEqual(rect.width, 0)
+            XCTAssertEqual(rect.height, 0)
+        }
+    }
+
     @MainActor
     func testStatusIndicatorRendersExpandedCapsule() throws {
         let view = StatusIndicatorView(
@@ -119,4 +135,5 @@ final class InfrastructureTests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+
 }
