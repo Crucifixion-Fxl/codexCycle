@@ -6,7 +6,7 @@ APP_BUNDLE := $(DERIVED_DATA)/Build/Products/Release/codexCycle.app
 DEBUG_APP_BUNDLE := $(DERIVED_DATA)/Build/Products/Debug/codexCycle.app
 INSTALL_PATH := /Applications/codexCycle.app
 
-.PHONY: build test release install uninstall purge clean
+.PHONY: build test release dmg install uninstall purge clean
 
 build:
 	xcodebuild -quiet \
@@ -41,6 +41,9 @@ release:
 		build
 	@/usr/bin/xattr -cr "$(APP_BUNDLE)"
 	@/usr/bin/codesign --force --deep --sign - "$(APP_BUNDLE)"
+
+dmg: release
+	@./scripts/create-dmg.sh "$(APP_BUNDLE)" "dist"
 
 install: release
 	@/usr/bin/pkill -x codexCycle >/dev/null 2>&1 || true

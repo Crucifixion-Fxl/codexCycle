@@ -26,10 +26,20 @@ make install
 ```sh
 make build      # Debug 构建
 make release    # Release 构建
+make dmg        # 生成 dist/codexCycle-<版本>-arm64.dmg
 make uninstall  # 卸载，保留偏好设置
 make purge      # 卸载并删除偏好设置
 make clean      # 删除仓库内构建产物
 ```
+
+## 下载安装
+
+从 GitHub Releases 下载 `codexCycle-<版本>-arm64.dmg`，打开后将
+`codexCycle.app` 拖入 `Applications`。
+
+当前公开构建使用 ad hoc 签名，尚未使用 Apple Developer ID 签名和公证。macOS
+可能在首次启动时阻止应用；请在“系统设置 → 隐私与安全性”中确认应用来源后选择
+“仍要打开”。不要使用来源不明的重新打包版本。
 
 ## 显示规则
 
