@@ -16,15 +16,17 @@
 
 ## Usage data
 
-- The sole data source is a compatible, locally installed and authenticated Codex CLI.
-- The app discovers Codex executables through the process `PATH`, common package-manager locations, and Spotlight metadata search.
+- The sole data source is a compatible, locally installed and authenticated Codex Runtime.
+- A Codex Runtime may come from an independently installed Codex CLI or from the Codex experience in the current ChatGPT desktop app. The pre-merge standalone Codex App is best-effort only and is not part of the formal compatibility promise.
+- The app discovers independent Codex CLI executables through the process `PATH`, common package-manager locations, and Spotlight metadata search, and discovers the runtime bundled with supported desktop apps.
 - Before execution, candidates must resolve to a local executable owned by the current user or root. The executable must not be group- or world-writable, ancestor directories must not be world-writable, and native executables must pass code-signature integrity validation. A group-writable Homebrew ancestor is allowed only when it is owned by the current user.
-- If multiple candidates remain, use the newest version that completes app-server initialization and supports `account/rateLimits/read`.
+- A Desktop Runtime is trusted only when the containing app has bundle identifier `com.openai.codex`, both the app and bundled executable pass macOS code-signature validation, and both are signed by OpenAI Team ID `2DC432GLL2`. Re-signed, modified, and unofficial desktop builds are rejected.
+- Prefer a compatible independent Codex CLI. If none is available, try the current ChatGPT Desktop Runtime, followed by the legacy Codex App on a best-effort basis. Within a source tier, use the newest version that completes app-server initialization and supports `account/rateLimits/read`.
 - Keep one private `codex app-server --stdio` child process alive for the app lifetime. Stop it when the app exits and restart it with delays of 1 second, 5 seconds, 30 seconds, then 5 minutes if it crashes.
 - Implement only the required JSON-RPC subset: initialization, `initialized`, `account/rateLimits/read`, and `account/rateLimits/updated`. Unknown fields and unrelated notifications are ignored.
 - A limit update notification triggers a full snapshot read instead of merging the sparse notification locally.
 - Never read, copy, store, display, or log Codex credentials.
-- If Codex is not logged in, show the unavailable state and instruct the user to log in through Codex separately; `codexCycle` does not open a terminal or browser.
+- If Codex is not logged in, show the unavailable state and instruct the user to log in through the corresponding Codex product separately; `codexCycle` does not open a terminal, desktop app, or browser.
 
 ## Weekly remaining calculation
 
@@ -78,13 +80,13 @@ The app has no main window. Clicking the indicator opens a Simplified Chinese me
 - The center indicator omits `%`, while the menu includes it.
 - The reset countdown uses at most two units and no seconds: `2 天 3 小时`, `4 小时 18 分钟`, or `不足 1 分钟`.
 - The menu recalculates relative times at least once per minute while the app runs.
-- Errors add one short Chinese reason: CLI not found, incompatible CLI, not logged in, weekly limit missing, network failure, or Codex service unavailable.
+- Errors add one short Chinese reason: Codex Runtime not found, incompatible Codex Runtime, not logged in, weekly limit missing, network failure, or Codex service unavailable.
 - If login launch is disabled, show that state and provide `打开登录项设置…`.
 - `退出 codexCycle` stops the current process but leaves launch-at-login registered.
 
 ## Cached state and failure behavior
 
-- Store only the last successful percentage, reset timestamp, fetch timestamp, verified CLI path and version, and login-registration attempt in the app's `UserDefaults`.
+- Store only the last successful percentage, reset timestamp, fetch timestamp, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`.
 - Persist a reading only when it has a reset timestamp.
 - On launch, show a persisted reading as gray and stale until a live refresh succeeds.
 - If the cached reset timestamp has passed, discard the reading and show `—`.
@@ -96,7 +98,7 @@ The app has no main window. Clicking the indicator opens a Simplified Chinese me
 - Register the main app with `SMAppService.mainApp` so it launches on login.
 - Respect a user-disabled login item. Do not repeatedly re-register it; show an action that opens the system Login Items settings.
 - Do not collect analytics, telemetry, or crash reports.
-- `codexCycle` performs no direct external network requests; Codex service access remains owned by the Codex CLI.
+- `codexCycle` performs no direct external network requests; Codex service access remains owned by the selected Codex Runtime.
 - Prevent duplicate running instances.
 
 ## Build and repository
@@ -113,7 +115,7 @@ The app has no main window. Clicking the indicator opens a Simplified Chinese me
 
 - Unit tests cover weekly-window selection, remaining calculation, gradient bands, countdown formatting, cache expiration, and error classification.
 - A fake JSONL app-server process covers initialization, timeout, process exit, sparse-update handling, and full-snapshot refresh without a real account.
-- Real acceptance verifies the indicator, menu, manual and periodic refresh, wake refresh, login launch, real weekly percentage, cache and stale states, CLI discovery, and error states.
+- Real acceptance verifies the indicator, menu, manual and periodic refresh, wake refresh, login launch, real weekly percentage, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
 - Reading limits must not start model work or consume model usage.
 - Idle operation must not continuously consume CPU.
 

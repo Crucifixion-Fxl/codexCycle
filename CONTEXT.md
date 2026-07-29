@@ -4,6 +4,18 @@
 
 ## Language
 
+**Codex Runtime**:
+能代表当前用户提供已认证 Codex 能力与限额数据的本地运行时；它既可以来自独立 Codex CLI，也可以来自受支持的 Codex Desktop。
+_Avoid_: Codex CLI（泛指所有运行时来源时）、数据接口
+
+**Codex Desktop**:
+当前 ChatGPT 桌面应用中的 Codex 编程体验；codexCycle 对桌面版的正式兼容承诺只指这一当前形态。
+_Avoid_: 独立 Codex App、ChatGPT 网页版
+
+**旧版 Codex App**:
+Codex 并入 ChatGPT 桌面应用之前发布的独立桌面应用，只接受尽力兼容，不属于 codexCycle 的正式兼容承诺。
+_Avoid_: Codex Desktop
+
 **Codex 周余量**:
 主 `codex` 计量桶的 7 天限额窗口内尚未使用的额度占比，以 0–100 的整数表示。
 _Avoid_: 余量、总余量、五小时余量

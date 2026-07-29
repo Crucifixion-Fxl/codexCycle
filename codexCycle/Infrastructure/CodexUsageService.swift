@@ -2,8 +2,8 @@ import Foundation
 import OSLog
 
 enum DisplayErrorReason: String, Equatable {
-    case cliNotFound = "未找到 Codex CLI"
-    case incompatibleCLI = "Codex CLI 不兼容"
+    case runtimeNotFound = "未找到 Codex Runtime"
+    case incompatibleRuntime = "Codex Runtime 不兼容"
     case notLoggedIn = "Codex 尚未登录"
     case weeklyLimitMissing = "未找到周限额"
     case networkFailure = "网络连接失败"
@@ -13,9 +13,9 @@ enum DisplayErrorReason: String, Equatable {
         if let locatorError = error as? CodexLocatorError {
             switch locatorError {
             case .notFound:
-                return .cliNotFound
+                return .runtimeNotFound
             case .incompatible:
-                return .incompatibleCLI
+                return .incompatibleRuntime
             }
         }
 
@@ -29,7 +29,7 @@ enum DisplayErrorReason: String, Equatable {
         if let appServerError = error as? AppServerClientError {
             switch appServerError {
             case .launchFailed, .malformedResponse:
-                return .incompatibleCLI
+                return .incompatibleRuntime
             case .server(_, let message):
                 let lowercased = message.lowercased()
                 if lowercased.contains("sign in")
@@ -159,7 +159,7 @@ final class CodexUsageService {
                             self.finishConnection(.failure(error))
                         }
                     case .failure(let error):
-                        if self.isUnsupportedMethod(error) {
+                        if self.isIncompatibleRuntime(error) {
                             candidateClient.stop()
                             self.tryCandidate(candidates, at: index + 1)
                         } else {
@@ -204,10 +204,17 @@ final class CodexUsageService {
         }
     }
 
-    private func isUnsupportedMethod(_ error: Error) -> Bool {
-        guard case AppServerClientError.server(let code, _) = error else {
+    private func isIncompatibleRuntime(_ error: Error) -> Bool {
+        guard let appServerError = error as? AppServerClientError else {
             return false
         }
-        return code == -32_601
+        switch appServerError {
+        case .malformedResponse:
+            return true
+        case .server(let code, _):
+            return code == -32_601
+        default:
+            return false
+        }
     }
 }

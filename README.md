@@ -8,9 +8,16 @@
 
 - Apple Silicon Mac，macOS 13 或更高版本
 - Xcode 26.3 或兼容的 Swift 6 工具链
-- 已在本机安装并登录可用的 Codex CLI
+- 已在本机安装并登录可用的 Codex Runtime：独立 Codex CLI 或当前 ChatGPT
+  Desktop 中的 Codex
 
-应用会扫描 `PATH`、常见包管理器位置和 Spotlight，验证候选可执行文件后选择最新兼容版本。它通过本地 `codex app-server --stdio` 读取 `account/rateLimits/read`，不读取或保存登录凭据，也不直接发起网络请求。
+应用优先使用通过 `PATH`、常见包管理器位置和 Spotlight 找到的兼容独立
+Codex CLI；没有兼容 CLI 时，改用当前 `ChatGPT.app` 内置的 Codex
+Runtime，最后尽力尝试合并前的旧版 `Codex.app`。Desktop Runtime 只有在 App
+Bundle ID、OpenAI Team ID 及 App/Runtime 两层代码签名均验证通过时才会执行。
+
+应用通过所选 Runtime 的本地 `codex app-server --stdio` 读取
+`account/rateLimits/read`，不读取或保存登录凭据，也不直接发起网络请求。
 
 ## 构建与安装
 
@@ -49,13 +56,18 @@ make clean      # 删除仓库内构建产物
 - 重置时间只显示最多两个单位的相对倒计时，不显示绝对时间和秒。
 - 旧缓存或刷新失败时保留数字并将圆环变灰；缓存跨过重置时间后立即作废。
 
-完整行为约定见 [产品规格](docs/product-spec.md)，数据源与非沙盒决策见 [ADR 0001](docs/adr/0001-use-codex-app-server-for-rate-limits.md) 和 [ADR 0002](docs/adr/0002-run-outside-the-app-sandbox.md)。
+完整行为约定见 [产品规格](docs/product-spec.md)，数据源与非沙盒决策见
+[ADR 0003](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md) 和
+[ADR 0002](docs/adr/0002-run-outside-the-app-sandbox.md)。
 
 ## 排查
 
-- 显示“未找到 Codex CLI”：确认终端中 `codex --version` 可运行。
-- 显示“Codex CLI 不兼容”：升级 Codex CLI 后选择“立即刷新”。
-- 显示“Codex 尚未登录”：在终端完成 Codex 登录；本应用不会打开登录页面。
+- 显示“未找到 Codex Runtime”：安装 Codex CLI，或安装并登录当前 ChatGPT
+  Desktop。
+- 显示“Codex Runtime 不兼容”：升级独立 Codex CLI 或 ChatGPT Desktop 后选择
+  “立即刷新”。
+- 显示“Codex 尚未登录”：通过对应的 Codex CLI 或 ChatGPT Desktop 完成登录；
+  本应用不会打开终端或登录页面。
 - 登录启动被禁用：从菜单打开“登录项”设置并允许 `codexCycle`。
 
 也可以运行只读诊断，复用应用自身的扫描与读取链路：
@@ -64,6 +76,6 @@ make clean      # 删除仓库内构建产物
 /Applications/codexCycle.app/Contents/MacOS/codexCycle --diagnose
 ```
 
-它只输出登录启动状态、选中的 CLI 路径和版本、周余量与重置时间戳，不输出凭据或原始协议内容。
+它只输出登录启动状态、选中的 Runtime 路径和版本、周余量与重置时间戳，不输出凭据或原始协议内容。
 
 应用只向 macOS 统一日志写入不含凭据和完整协议数据的诊断信息。
