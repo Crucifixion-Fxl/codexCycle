@@ -10,13 +10,13 @@ final class AppServerClientTests: XCTestCase {
         super.tearDown()
     }
 
-    func testInitializesReadsWeeklyLimitsAndEmitsUpdateNotification() throws {
+    func testInitializesReadsQuotaLimitsAndEmitsUpdateNotification() throws {
         let script = try makeScript(
             body: """
             while IFS= read -r line; do
               case "$line" in
                 *rateLimits*)
-                  printf '%s\\n' '{"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1800100000},"secondary":null},"rateLimitsByLimitId":null}}'
+                  printf '%s\\n' '{"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":25,"windowDurationMins":300,"resetsAt":1800010000},"secondary":{"usedPercent":3,"windowDurationMins":10080,"resetsAt":1800100000}},"rateLimitsByLimitId":null}}'
                   ;;
                 *initialized*)
                   printf '%s\\n' '{"method":"account/rateLimits/updated","params":{"rateLimits":{"limitId":"codex"}}}'
@@ -45,8 +45,10 @@ final class AppServerClientTests: XCTestCase {
                 do {
                     let payload = try response.get()
                     XCTAssertEqual(payload.rateLimits.limitId, "codex")
-                    XCTAssertEqual(payload.rateLimits.primary?.usedPercent, 3)
-                    XCTAssertEqual(payload.rateLimits.primary?.windowDurationMins, 10_080)
+                    XCTAssertEqual(payload.rateLimits.primary?.usedPercent, 25)
+                    XCTAssertEqual(payload.rateLimits.primary?.windowDurationMins, 300)
+                    XCTAssertEqual(payload.rateLimits.secondary?.usedPercent, 3)
+                    XCTAssertEqual(payload.rateLimits.secondary?.windowDurationMins, 10_080)
                 } catch {
                     XCTFail("Unexpected read error: \(error)")
                 }

@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		A00000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* AppDelegate.swift */; };
 		A00000000000000000000002 /* RateLimitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* RateLimitModels.swift */; };
-		A00000000000000000000003 /* WeeklyUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* WeeklyUsage.swift */; };
+		A00000000000000000000003 /* QuotaUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* QuotaUsage.swift */; };
 		A00000000000000000000004 /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* AppServerClient.swift */; };
 		A00000000000000000000005 /* CodexLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* CodexLocator.swift */; };
 		A00000000000000000000006 /* CodexUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* CodexUsageService.swift */; };
@@ -21,7 +21,7 @@
 		A0000000000000000000000C /* StatusMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000C /* StatusMenuController.swift */; };
 		A0000000000000000000000D /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* RefreshCoordinator.swift */; };
 		A0000000000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* Assets.xcassets */; };
-		A00000000000000000000011 /* WeeklyUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* WeeklyUsageParserTests.swift */; };
+		A00000000000000000000011 /* QuotaUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* QuotaUsageParserTests.swift */; };
 		A00000000000000000000012 /* RelativeTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* RelativeTimeFormatterTests.swift */; };
 		A00000000000000000000013 /* UsageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* UsageCacheTests.swift */; };
 		A00000000000000000000014 /* AppServerClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* AppServerClientTests.swift */; };
@@ -41,7 +41,7 @@
 /* Begin PBXFileReference section */
 		F00000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		F00000000000000000000002 /* RateLimitModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateLimitModels.swift; sourceTree = "<group>"; };
-		F00000000000000000000003 /* WeeklyUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyUsage.swift; sourceTree = "<group>"; };
+		F00000000000000000000003 /* QuotaUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaUsage.swift; sourceTree = "<group>"; };
 		F00000000000000000000004 /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
 		F00000000000000000000005 /* CodexLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexLocator.swift; sourceTree = "<group>"; };
 		F00000000000000000000006 /* CodexUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageService.swift; sourceTree = "<group>"; };
@@ -54,7 +54,7 @@
 		F0000000000000000000000D /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 		F0000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F0000000000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		F00000000000000000000011 /* WeeklyUsageParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyUsageParserTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000011 /* QuotaUsageParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaUsageParserTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000012 /* RelativeTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelativeTimeFormatterTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000013 /* UsageCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCacheTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000014 /* AppServerClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientTests.swift; sourceTree = "<group>"; };
@@ -108,7 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				F00000000000000000000002 /* RateLimitModels.swift */,
-				F00000000000000000000003 /* WeeklyUsage.swift */,
+				F00000000000000000000003 /* QuotaUsage.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -147,7 +147,7 @@
 		G00000000000000000000007 /* codexCycleTests */ = {
 			isa = PBXGroup;
 			children = (
-				F00000000000000000000011 /* WeeklyUsageParserTests.swift */,
+				F00000000000000000000011 /* QuotaUsageParserTests.swift */,
 				F00000000000000000000012 /* RelativeTimeFormatterTests.swift */,
 				F00000000000000000000013 /* UsageCacheTests.swift */,
 				F00000000000000000000014 /* AppServerClientTests.swift */,
@@ -267,7 +267,7 @@
 			files = (
 				A00000000000000000000001 /* AppDelegate.swift in Sources */,
 				A00000000000000000000002 /* RateLimitModels.swift in Sources */,
-				A00000000000000000000003 /* WeeklyUsage.swift in Sources */,
+				A00000000000000000000003 /* QuotaUsage.swift in Sources */,
 				A00000000000000000000004 /* AppServerClient.swift in Sources */,
 				A00000000000000000000005 /* CodexLocator.swift in Sources */,
 				A00000000000000000000006 /* CodexUsageService.swift in Sources */,
@@ -285,7 +285,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00000000000000000000011 /* WeeklyUsageParserTests.swift in Sources */,
+				A00000000000000000000011 /* QuotaUsageParserTests.swift in Sources */,
 				A00000000000000000000012 /* RelativeTimeFormatterTests.swift in Sources */,
 				A00000000000000000000013 /* UsageCacheTests.swift in Sources */,
 				A00000000000000000000014 /* AppServerClientTests.swift in Sources */,
@@ -310,7 +310,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = codexCycle/Info.plist;
@@ -319,7 +319,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fxl.codexCycle;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -335,7 +335,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = codexCycle/Info.plist;
@@ -344,7 +344,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fxl.codexCycle;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

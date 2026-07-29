@@ -53,7 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             service: service,
             cache: UserDefaultsUsageCache(),
             menuController: menuController,
-            loginItemManager: loginItemManager
+            loginItemManager: loginItemManager,
+            preferences: preferences
         )
 
         self.coordinator = coordinator
@@ -75,11 +76,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         service.fetch { [weak self] result in
             switch result {
-            case .success(let reading):
+            case .success(let snapshot):
                 print("Codex Runtime: \(preferences.selectedCodexPath ?? "—")")
                 print("Codex 版本: \(preferences.selectedCodexVersion ?? "—")")
-                print("周余量: \(reading.remainingPercent)%")
-                print("重置时间戳: \(reading.resetsAt?.timeIntervalSince1970.description ?? "—")")
+                print(
+                    "5 小时余量: \(snapshot.fiveHour.map { "\($0.remainingPercent)%" } ?? "—")"
+                )
+                print(
+                    "5 小时重置时间戳: \(snapshot.fiveHour?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                )
+                print(
+                    "周余量: \(snapshot.weekly.map { "\($0.remainingPercent)%" } ?? "—")"
+                )
+                print(
+                    "周重置时间戳: \(snapshot.weekly?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                )
             case .failure(let error):
                 print("诊断失败: \(String(reflecting: error))")
             }
