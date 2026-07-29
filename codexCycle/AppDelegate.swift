@@ -76,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         service.fetch { [weak self] result in
             switch result {
             case .success(let reading):
-                print("Codex CLI: \(preferences.selectedCodexPath ?? "—")")
+                print("Codex Runtime: \(preferences.selectedCodexPath ?? "—")")
                 print("Codex 版本: \(preferences.selectedCodexVersion ?? "—")")
                 print("周余量: \(reading.remainingPercent)%")
                 print("重置时间戳: \(reading.resetsAt?.timeIntervalSince1970.description ?? "—")")
