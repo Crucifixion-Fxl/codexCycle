@@ -188,7 +188,10 @@ final class InfrastructureTests: XCTestCase {
             DisplayErrorReason.classify(CodexLocatorError.incompatible).rawValue,
             "Codex Runtime 不兼容"
         )
-        XCTAssertEqual(DisplayErrorReason.classify(WeeklyUsageError.noWeeklyWindow), .weeklyLimitMissing)
+        XCTAssertEqual(
+            DisplayErrorReason.classify(QuotaUsageError.noSupportedWindows),
+            .supportedLimitsMissing
+        )
         XCTAssertEqual(
             DisplayErrorReason.classify(
                 AppServerClientError.server(code: 401, message: "authentication required")
@@ -310,6 +313,41 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertGreaterThan(snapshot.buttonBounds.height, 0)
         XCTAssertGreaterThan(snapshot.indicatorBounds.height, 0)
         XCTAssertTrue(snapshot.isAttachedToWindow)
+    }
+
+    @MainActor
+    func testMenuDistinguishesPreferredAndCurrentViewsDuringFallback() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let controller = StatusMenuController()
+        controller.update(
+            state: .fresh(
+                QuotaUsageSnapshot(
+                    fiveHour: nil,
+                    weekly: QuotaUsageReading(
+                        remainingPercent: 42,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        fetchedAt: now
+                    )
+                )
+            ),
+            preferredWindow: .fiveHour,
+            refreshing: false,
+            loginLaunchState: .enabled,
+            now: now
+        )
+
+        let presentation = controller.presentationSnapshot
+
+        XCTAssertEqual(presentation.indicatorRemainingPercent, 42)
+        XCTAssertTrue(presentation.fiveHourIsPreferred)
+        XCTAssertFalse(presentation.weeklyIsPreferred)
+        XCTAssertEqual(presentation.fiveHourTitle, "5 小时余量      —")
+        XCTAssertEqual(presentation.weeklyTitle, "周余量      42%")
+        XCTAssertEqual(
+            presentation.currentViewTitle,
+            "当前显示      周余量（5 小时数据不可用）"
+        )
+        XCTAssertEqual(presentation.resetTitle, "重置倒计时    1 天")
     }
 
     private func assertDesktopRuntimeIsRejected(

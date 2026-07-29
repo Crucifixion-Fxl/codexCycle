@@ -22,39 +22,82 @@ final class UsageCacheTests: XCTestCase {
         super.tearDown()
     }
 
-    func testPersistsReadingWithFutureResetAsStaleStartupData() {
-        let reading = WeeklyUsageReading(
+    func testPersistsSnapshotWithFutureResetAsStaleStartupData() {
+        let reading = QuotaUsageReading(
             remainingPercent: 44,
             resetsAt: now.addingTimeInterval(3_600),
             fetchedAt: now.addingTimeInterval(-300)
         )
+        let snapshot = QuotaUsageSnapshot(fiveHour: reading, weekly: nil)
 
-        cache.save(reading)
+        cache.save(snapshot)
 
-        XCTAssertEqual(cache.load(now: now), reading)
+        XCTAssertEqual(cache.load(now: now), snapshot)
     }
 
-    func testDiscardsReadingAfterItsResetWindow() {
+    func testExpiresEachCachedWindowIndependently() {
+        let weekly = QuotaUsageReading(
+            remainingPercent: 44,
+            resetsAt: now.addingTimeInterval(86_400),
+            fetchedAt: now.addingTimeInterval(-300)
+        )
         cache.save(
-            WeeklyUsageReading(
-                remainingPercent: 44,
-                resetsAt: now.addingTimeInterval(-1),
-                fetchedAt: now.addingTimeInterval(-300)
+            QuotaUsageSnapshot(
+                fiveHour: QuotaUsageReading(
+                    remainingPercent: 70,
+                    resetsAt: now.addingTimeInterval(-1),
+                    fetchedAt: now.addingTimeInterval(-300)
+                ),
+                weekly: weekly
+            )
+        )
+
+        XCTAssertEqual(
+            cache.load(now: now),
+            QuotaUsageSnapshot(fiveHour: nil, weekly: weekly)
+        )
+    }
+
+    func testDiscardsSnapshotAfterItsOnlyWindowResets() {
+        cache.save(
+            QuotaUsageSnapshot(
+                fiveHour: nil,
+                weekly: QuotaUsageReading(
+                    remainingPercent: 44,
+                    resetsAt: now.addingTimeInterval(-1),
+                    fetchedAt: now.addingTimeInterval(-300)
+                )
             )
         )
 
         XCTAssertNil(cache.load(now: now))
     }
 
-    func testDoesNotPersistReadingWithoutResetTimestamp() {
+    func testDoesNotPersistWindowWithoutResetTimestamp() {
         cache.save(
-            WeeklyUsageReading(
-                remainingPercent: 44,
-                resetsAt: nil,
-                fetchedAt: now
+            QuotaUsageSnapshot(
+                fiveHour: QuotaUsageReading(
+                    remainingPercent: 44,
+                    resetsAt: nil,
+                    fetchedAt: now
+                ),
+                weekly: nil
             )
         )
 
         XCTAssertNil(cache.load(now: now))
+    }
+
+    func testPreferredQuotaWindowDefaultsToFiveHourAndPersistsSelection() {
+        let preferences = AppPreferences(defaults: defaults)
+
+        XCTAssertEqual(preferences.preferredQuotaWindow, .fiveHour)
+
+        preferences.preferredQuotaWindow = .weekly
+
+        XCTAssertEqual(
+            AppPreferences(defaults: defaults).preferredQuotaWindow,
+            .weekly
+        )
     }
 }
