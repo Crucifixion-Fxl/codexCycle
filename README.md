@@ -1,81 +1,98 @@
 # codexCycle
 
-`codexCycle` 是一个仅驻留在 macOS 状态栏的个人工具，用圆环和中心整数显示 Codex 主账户的 5 小时或周余量。首次使用默认显示 5 小时余量，也可从菜单切换并记住首选视图。它没有 Dock 图标、主窗口、通知、遥测或独立登录流程。
+**English** | [简体中文](README.zh-CN.md)
 
-状态栏圆环每 5 分钟自动刷新，也会在启动、Mac 唤醒、Codex 限额变化、切换限额视图和手动刷新时更新。点击圆环可切换 5 小时/周限额，并查看当前视图的相对重置倒计时和最后更新时间。
+`codexCycle` is a lightweight macOS menu-bar app that keeps your Codex quota
+visible without opening another window. It shows either the five-hour or weekly
+remaining percentage, refreshes automatically, and uses your existing local
+Codex authentication.
 
-## 环境要求
+<p align="center">
+  <img src="docs/images/codexcycle-status-item.png" width="100" alt="codexCycle menu-bar indicator showing 85 percent remaining">
+</p>
 
-- Apple Silicon Mac，macOS 13 或更高版本
-- Xcode 26.3 或兼容的 Swift 6 工具链
-- 已在本机安装并登录可用的 Codex Runtime：独立 Codex CLI 或当前 ChatGPT
-  Desktop 中的 Codex
+## What it shows
 
-应用优先使用通过 `PATH`、常见包管理器位置和 Spotlight 找到的兼容独立
-Codex CLI；没有兼容 CLI 时，改用当前 `ChatGPT.app` 内置的 Codex
-Runtime，最后尽力尝试合并前的旧版 `Codex.app`。Desktop Runtime 只有在 App
-Bundle ID、OpenAI Team ID 及 App/Runtime 两层代码签名均验证通过时才会执行。
+- The number in the menu bar is the remaining percentage for the current quota
+  view. The center omits the `%` sign to stay readable at menu-bar size.
+- The remaining arc follows a fixed red → yellow → green scale: red at `0`,
+  yellow at `20`, and green from `50` through `100`.
+- Clicking the indicator opens both quota readings, reset countdown, last update
+  time, manual refresh, and language controls.
+- English is the first-launch default. You can switch to Simplified Chinese
+  immediately; the app remembers your choice.
 
-应用通过所选 Runtime 的本地 `codex app-server --stdio` 读取
-`account/rateLimits/read`，不读取或保存登录凭据，也不直接发起网络请求。
+## Display logic
 
-## 构建与安装
+- The five-hour quota is the first-use preferred view. Choosing the weekly view
+  updates the indicator immediately and persists across launches.
+- If the preferred quota is unavailable but the other quota exists, the app
+  temporarily displays the available reading without changing your preference.
+- Remaining quota is `floor(100 - usedPercent)`, clamped to `0...100`.
+- A failed refresh keeps a valid cached number but turns the ring gray. A reading
+  expires at its reset boundary; no valid reading is shown as `—`.
+- Reset time is relative, uses at most two units, and never displays seconds.
+- Data refreshes on launch, every five minutes, after wake, after a quota update,
+  when switching views, and on manual refresh.
+
+## Requirements
+
+- Apple Silicon Mac
+- macOS 13 or later
+- An installed and authenticated Codex Runtime:
+  - an independent Codex CLI, or
+  - Codex in the current ChatGPT desktop app
+
+## Install
+
+Download the latest arm64 DMG from
+[GitHub Releases](https://github.com/Crucifixion-Fxl/codexCycle/releases/latest),
+open it, and drag `codexCycle.app` into `Applications`.
+
+Public builds currently use ad hoc signing and are not notarized. On first
+launch, macOS may require approval in **System Settings → Privacy & Security →
+Open Anyway**. Only install releases from this repository.
+
+## Build from source
 
 ```sh
-make test
-make install
+make test       # Run the test suite
+make install    # Build, install to /Applications, and launch
 ```
 
-`make install` 会生成 arm64 Release 版本，以本地 ad hoc 签名安装到 `/Applications/codexCycle.app` 并启动。首次启动会尝试注册“登录时打开”；如果系统中已禁用，可从状态栏菜单打开“登录项”设置。
-
-其他命令：
+Additional targets:
 
 ```sh
-make build      # Debug 构建
-make release    # Release 构建
-make dmg        # 生成 dist/codexCycle-<版本>-arm64.dmg
-make uninstall  # 卸载，保留偏好设置
-make purge      # 卸载并删除偏好设置
-make clean      # 删除仓库内构建产物
+make build      # Debug build
+make release    # Release build
+make dmg        # Create dist/codexCycle-<version>-arm64.dmg
+make uninstall  # Remove the app and preserve preferences
+make purge      # Remove the app and its preferences
 ```
 
-## 下载安装
+## Data and privacy
 
-从 GitHub Releases 下载 `codexCycle-<版本>-arm64.dmg`，打开后将
-`codexCycle.app` 拖入 `Applications`。
+`codexCycle` reads `account/rateLimits/read` from a local
+`codex app-server --stdio` process. It does not read or store credentials, make
+direct network requests, collect analytics, or send telemetry. Runtime
+executables are validated before launch.
 
-当前公开构建使用 ad hoc 签名，尚未使用 Apple Developer ID 签名和公证。macOS
-可能在首次启动时阻止应用；请在“系统设置 → 隐私与安全性”中确认应用来源后选择
-“仍要打开”。不要使用来源不明的重新打包版本。
+For implementation details, see the [product specification](docs/product-spec.md)
+and the [runtime](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md)
+and [sandbox](docs/adr/0002-run-outside-the-app-sandbox.md) decisions.
 
-## 显示规则
+## Troubleshooting
 
-- 只使用 `limitId = codex` 且 `windowDurationMins = 300` 的 5 小时窗口或 `windowDurationMins = 10080` 的周窗口。
-- 两种余量均为 `floor(100 - usedPercent)`，限制在 `0...100`。
-- 状态栏中心只显示当前视图的整数；菜单中的两种余量带 `%`。
-- 重置时间只显示最多两个单位的相对倒计时，不显示绝对时间和秒。
-- 旧缓存或刷新失败时保留数字并将圆环变灰；缓存跨过重置时间后立即作废。
+- **Codex Runtime not found:** install Codex CLI, or install and sign in to the
+  current ChatGPT desktop app.
+- **Codex Runtime incompatible:** update Codex CLI or ChatGPT, then choose
+  **Refresh Now**.
+- **Codex is not signed in:** sign in through the corresponding Codex product.
+- **Launch at Login Disabled:** open Login Items Settings from the app menu and
+  allow `codexCycle`.
 
-完整行为约定见 [产品规格](docs/product-spec.md)，数据源与非沙盒决策见
-[ADR 0003](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md) 和
-[ADR 0002](docs/adr/0002-run-outside-the-app-sandbox.md)。
-
-## 排查
-
-- 显示“未找到 Codex Runtime”：安装 Codex CLI，或安装并登录当前 ChatGPT
-  Desktop。
-- 显示“Codex Runtime 不兼容”：升级独立 Codex CLI 或 ChatGPT Desktop 后选择
-  “立即刷新”。
-- 显示“Codex 尚未登录”：通过对应的 Codex CLI 或 ChatGPT Desktop 完成登录；
-  本应用不会打开终端或登录页面。
-- 登录启动被禁用：从菜单打开“登录项”设置并允许 `codexCycle`。
-
-也可以运行只读诊断，复用应用自身的扫描与读取链路：
+Read-only diagnostics:
 
 ```sh
 /Applications/codexCycle.app/Contents/MacOS/codexCycle --diagnose
 ```
-
-它只输出登录启动状态、选中的 Runtime 路径和版本、两种限额余量与重置时间戳，不输出凭据或原始协议内容。
-
-应用只向 macOS 统一日志写入不含凭据和完整协议数据的诊断信息。

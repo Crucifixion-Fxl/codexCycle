@@ -41,6 +41,8 @@ struct StatusItemLayoutSnapshot {
 
 struct StatusMenuPresentationSnapshot {
     let indicatorRemainingPercent: Int?
+    let language: AppLanguage
+    let quotaHeaderTitle: String
     let fiveHourTitle: String
     let weeklyTitle: String
     let fiveHourIsPreferred: Bool
@@ -66,17 +68,24 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let resetItem = NSMenuItem()
     private let updatedItem = NSMenuItem()
     private let errorItem = NSMenuItem()
+    private let languageHeaderItem = NSMenuItem()
+    private let englishLanguageItem = NSMenuItem()
+    private let simplifiedChineseLanguageItem = NSMenuItem()
     private let refreshItem = NSMenuItem()
     private let loginDisabledItem = NSMenuItem()
     private let openLoginSettingsItem = NSMenuItem()
+    private let quitItem = NSMenuItem()
 
     private var state: UsageDisplayState = .unavailable(nil)
     private var preferredWindow: QuotaWindow = .fiveHour
     private var refreshing = false
     private var loginLaunchState: LoginLaunchState = .enabled
+    private var language: AppLanguage
+    private var localization: AppLocalization
 
     var onRefresh: (() -> Void)?
     var onSelectQuotaWindow: ((QuotaWindow) -> Void)?
+    var onSelectLanguage: ((AppLanguage) -> Void)?
     var onOpenLoginSettings: (() -> Void)?
 
     var layoutSnapshot: StatusItemLayoutSnapshot {
@@ -90,6 +99,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var presentationSnapshot: StatusMenuPresentationSnapshot {
         StatusMenuPresentationSnapshot(
             indicatorRemainingPercent: indicatorView.remainingPercent,
+            language: language,
+            quotaHeaderTitle: quotaHeaderItem.title,
             fiveHourTitle: fiveHourItem.title,
             weeklyTitle: weeklyItem.title,
             fiveHourIsPreferred: fiveHourItem.state == .on,
@@ -101,7 +112,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         )
     }
 
-    override init() {
+    init(language: AppLanguage = .english) {
+        self.language = language
+        localization = AppLocalization(language: language)
         statusItem = NSStatusBar.system.statusItem(
             withLength: StatusIndicatorMetrics.statusItemWidth
         )
@@ -151,6 +164,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         updateMenuText(now: Date())
     }
 
+    func setLanguage(_ language: AppLanguage, now: Date = Date()) {
+        self.language = language
+        localization = AppLocalization(language: language)
+        updateMenuText(now: now)
+    }
+
     @objc private func refreshSelected() {
         onRefresh?()
     }
@@ -161,6 +180,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func weeklySelected() {
         onSelectQuotaWindow?(.weekly)
+    }
+
+    @objc private func englishLanguageSelected() {
+        onSelectLanguage?(.english)
+    }
+
+    @objc private func simplifiedChineseLanguageSelected() {
+        onSelectLanguage?(.simplifiedChinese)
     }
 
     @objc private func openLoginSettingsSelected() {
@@ -191,7 +218,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
 
-        quotaHeaderItem.title = "显示限额"
         quotaHeaderItem.isEnabled = false
         menu.addItem(quotaHeaderItem)
 
@@ -212,17 +238,27 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        refreshItem.title = "立即刷新"
+        languageHeaderItem.isEnabled = false
+        menu.addItem(languageHeaderItem)
+
+        englishLanguageItem.target = self
+        englishLanguageItem.action = #selector(englishLanguageSelected)
+        menu.addItem(englishLanguageItem)
+
+        simplifiedChineseLanguageItem.target = self
+        simplifiedChineseLanguageItem.action = #selector(simplifiedChineseLanguageSelected)
+        menu.addItem(simplifiedChineseLanguageItem)
+
+        menu.addItem(.separator())
+
         refreshItem.target = self
         refreshItem.action = #selector(refreshSelected)
         menu.addItem(refreshItem)
 
-        loginDisabledItem.title = "登录启动已禁用"
         loginDisabledItem.isEnabled = false
         loginDisabledItem.isHidden = true
         menu.addItem(loginDisabledItem)
 
-        openLoginSettingsItem.title = "打开登录项设置…"
         openLoginSettingsItem.target = self
         openLoginSettingsItem.action = #selector(openLoginSettingsSelected)
         openLoginSettingsItem.isHidden = true
@@ -230,11 +266,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        let quitItem = NSMenuItem(
-            title: "退出 codexCycle",
-            action: #selector(quitSelected),
-            keyEquivalent: "q"
-        )
+        quitItem.action = #selector(quitSelected)
+        quitItem.keyEquivalent = "q"
         quitItem.target = self
         menu.addItem(quitItem)
     }
@@ -245,7 +278,20 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             preferredWindow: preferredWindow,
             snapshot: snapshot
         )
-        let staleSuffix = state.isStale ? "（旧数据）" : ""
+        quotaHeaderItem.title = localization.text("menu.quota_header")
+        languageHeaderItem.title = localization.text("menu.language_header")
+        englishLanguageItem.title = localization.text("menu.language_english")
+        simplifiedChineseLanguageItem.title = localization.text(
+            "menu.language_simplified_chinese"
+        )
+        englishLanguageItem.state = language == .english ? .on : .off
+        simplifiedChineseLanguageItem.state = language == .simplifiedChinese
+            ? .on
+            : .off
+
+        let staleSuffix = state.isStale
+            ? localization.text("menu.stale_suffix")
+            : ""
         let fiveHourPresentation = presentation(for: .fiveHour)
         let weeklyPresentation = presentation(for: .weekly)
 
@@ -265,29 +311,56 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         if selection.isFallback, let currentWindow = selection.currentWindow {
             let current = presentation(for: currentWindow)
             let preferred = presentation(for: preferredWindow)
-            currentViewItem.title = "当前显示      \(current.label)（\(preferred.shortLabel)数据不可用）"
+            currentViewItem.title = localization.format(
+                "menu.current_view",
+                current.label,
+                preferred.shortLabel
+            )
             currentViewItem.isHidden = false
         } else {
             currentViewItem.isHidden = true
         }
 
         if let reading = selection.currentReading {
-            resetItem.title = "重置倒计时    \(RelativeTimeText.countdown(to: reading.resetsAt, now: now))"
-            updatedItem.title = "最后更新      \(RelativeTimeText.since(reading.fetchedAt, now: now))"
+            resetItem.title = localization.format(
+                "menu.reset_countdown",
+                RelativeTimeText.countdown(
+                    to: reading.resetsAt,
+                    now: now,
+                    localization: localization
+                )
+            )
+            updatedItem.title = localization.format(
+                "menu.last_updated",
+                RelativeTimeText.since(
+                    reading.fetchedAt,
+                    now: now,
+                    localization: localization
+                )
+            )
         } else {
-            resetItem.title = "重置倒计时    —"
-            updatedItem.title = "最后更新      —"
+            resetItem.title = localization.format("menu.reset_countdown", "—")
+            updatedItem.title = localization.format("menu.last_updated", "—")
         }
 
         if let reason = state.errorReason {
-            errorItem.title = "原因          \(reason.rawValue)"
+            errorItem.title = localization.format(
+                "menu.reason",
+                localization.text(reason.localizationKey)
+            )
             errorItem.isHidden = false
         } else {
             errorItem.isHidden = true
         }
 
-        refreshItem.title = refreshing ? "正在刷新…" : "立即刷新"
+        refreshItem.title = localization.text(
+            refreshing ? "menu.refreshing" : "menu.refresh"
+        )
         refreshItem.isEnabled = !refreshing
+
+        loginDisabledItem.title = localization.text("menu.login_disabled")
+        openLoginSettingsItem.title = localization.text("menu.open_login_settings")
+        quitItem.title = localization.text("menu.quit")
 
         let loginDisabled = loginLaunchState == .disabled
         loginDisabledItem.isHidden = !loginDisabled
@@ -312,13 +385,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         switch window {
         case .fiveHour:
             return QuotaWindowPresentation(
-                label: "5 小时余量",
-                shortLabel: "5 小时"
+                label: localization.text("menu.five_hour_remaining"),
+                shortLabel: localization.text("menu.five_hour_short")
             )
         case .weekly:
             return QuotaWindowPresentation(
-                label: "周余量",
-                shortLabel: "周"
+                label: localization.text("menu.weekly_remaining"),
+                shortLabel: localization.text("menu.weekly_short")
             )
         }
     }

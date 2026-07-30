@@ -68,6 +68,9 @@ final class RefreshCoordinator {
         menuController.onSelectQuotaWindow = { [weak self] window in
             self?.selectQuotaWindow(window)
         }
+        menuController.onSelectLanguage = { [weak self] language in
+            self?.selectLanguage(language)
+        }
         menuController.onOpenLoginSettings = { [weak self] in
             self?.loginItemManager.openSystemSettings()
         }
@@ -268,5 +271,11 @@ final class RefreshCoordinator {
         scheduleExpirationBoundaryTimer()
         updatePresentation()
         requestRefresh(trigger: .viewSelection)
+    }
+
+    private func selectLanguage(_ language: AppLanguage) {
+        preferences.appLanguage = language
+        menuController.setLanguage(language)
+        updatePresentation()
     }
 }

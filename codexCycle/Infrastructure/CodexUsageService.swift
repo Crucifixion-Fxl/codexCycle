@@ -1,13 +1,30 @@
 import Foundation
 import OSLog
 
-enum DisplayErrorReason: String, Equatable {
-    case runtimeNotFound = "未找到 Codex Runtime"
-    case incompatibleRuntime = "Codex Runtime 不兼容"
-    case notLoggedIn = "Codex 尚未登录"
-    case supportedLimitsMissing = "未找到 5 小时或周限额"
-    case networkFailure = "网络连接失败"
-    case serviceUnavailable = "Codex 服务暂时不可用"
+enum DisplayErrorReason: Equatable {
+    case runtimeNotFound
+    case incompatibleRuntime
+    case notLoggedIn
+    case supportedLimitsMissing
+    case networkFailure
+    case serviceUnavailable
+
+    var localizationKey: String {
+        switch self {
+        case .runtimeNotFound:
+            return "error.runtime_not_found"
+        case .incompatibleRuntime:
+            return "error.incompatible_runtime"
+        case .notLoggedIn:
+            return "error.not_logged_in"
+        case .supportedLimitsMissing:
+            return "error.supported_limits_missing"
+        case .networkFailure:
+            return "error.network_failure"
+        case .serviceUnavailable:
+            return "error.service_unavailable"
+        }
+    }
 
     static func classify(_ error: Error) -> DisplayErrorReason {
         if let locatorError = error as? CodexLocatorError {
