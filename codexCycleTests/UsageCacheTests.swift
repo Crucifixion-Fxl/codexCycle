@@ -100,4 +100,17 @@ final class UsageCacheTests: XCTestCase {
             .weekly
         )
     }
+
+    func testLanguageDefaultsToEnglishAndPersistsSelection() {
+        let preferences = AppPreferences(defaults: defaults)
+
+        XCTAssertEqual(preferences.appLanguage, .english)
+
+        preferences.appLanguage = .simplifiedChinese
+
+        XCTAssertEqual(
+            AppPreferences(defaults: defaults).appLanguage,
+            .simplifiedChinese
+        )
+    }
 }

@@ -21,6 +21,8 @@
 		A0000000000000000000000C /* StatusMenuController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000C /* StatusMenuController.swift */; };
 		A0000000000000000000000D /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000D /* RefreshCoordinator.swift */; };
 		A0000000000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* Assets.xcassets */; };
+		A00000000000000000000016 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000016 /* AppLocalization.swift */; };
+		A00000000000000000000017 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = V00000000000000000000001 /* Localizable.strings */; };
 		A00000000000000000000011 /* QuotaUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* QuotaUsageParserTests.swift */; };
 		A00000000000000000000012 /* RelativeTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* RelativeTimeFormatterTests.swift */; };
 		A00000000000000000000013 /* UsageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* UsageCacheTests.swift */; };
@@ -54,6 +56,9 @@
 		F0000000000000000000000D /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 		F0000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F0000000000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F00000000000000000000016 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
+		F00000000000000000000017 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F00000000000000000000018 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		F00000000000000000000011 /* QuotaUsageParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaUsageParserTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000012 /* RelativeTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelativeTimeFormatterTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000013 /* UsageCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCacheTests.swift; sourceTree = "<group>"; };
@@ -98,6 +103,7 @@
 				G00000000000000000000004 /* Infrastructure */,
 				G00000000000000000000005 /* Presentation */,
 				G00000000000000000000006 /* Coordination */,
+				V00000000000000000000001 /* Localizable.strings */,
 				F0000000000000000000000F /* Assets.xcassets */,
 				F0000000000000000000000E /* Info.plist */,
 			);
@@ -129,6 +135,7 @@
 		G00000000000000000000005 /* Presentation */ = {
 			isa = PBXGroup;
 			children = (
+				F00000000000000000000016 /* AppLocalization.swift */,
 				F0000000000000000000000A /* RelativeTimeFormatter.swift */,
 				F0000000000000000000000B /* StatusIndicatorView.swift */,
 				F0000000000000000000000C /* StatusMenuController.swift */,
@@ -224,12 +231,12 @@
 			};
 			buildConfigurationList = L00000000000000000000003 /* Build configuration list for PBXProject "codexCycle" */;
 			compatibilityVersion = "Xcode 15.0";
-			developmentRegion = zh_CN;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
-				zh_CN,
+				"zh-Hans",
 			);
 			mainGroup = G00000000000000000000001;
 			productRefGroup = G00000000000000000000008 /* Products */;
@@ -248,6 +255,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000000E /* Assets.xcassets in Resources */,
+				A00000000000000000000017 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,6 +274,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000001 /* AppDelegate.swift in Sources */,
+				A00000000000000000000016 /* AppLocalization.swift in Sources */,
 				A00000000000000000000002 /* RateLimitModels.swift in Sources */,
 				A00000000000000000000003 /* QuotaUsage.swift in Sources */,
 				A00000000000000000000004 /* AppServerClient.swift in Sources */,
@@ -303,6 +312,18 @@
 		};
 /* End PBXTargetDependency section */
 
+/* Begin PBXVariantGroup section */
+		V00000000000000000000001 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				F00000000000000000000017 /* en */,
+				F00000000000000000000018 /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
 		C00000000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -310,7 +331,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = codexCycle/Info.plist;
@@ -319,7 +340,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fxl.codexCycle;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -335,7 +356,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				ENABLE_APP_SANDBOX = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = codexCycle/Info.plist;
@@ -344,7 +365,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fxl.codexCycle;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

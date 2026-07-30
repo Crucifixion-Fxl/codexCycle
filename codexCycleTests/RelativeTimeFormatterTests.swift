@@ -7,23 +7,44 @@ final class RelativeTimeFormatterTests: XCTestCase {
     func testCountdownUsesAtMostTwoUnits() {
         XCTAssertEqual(
             RelativeTimeText.countdown(to: now.addingTimeInterval(2 * 86_400 + 3 * 3_600), now: now),
-            "2 天 3 小时"
+            "2 days 3 hours"
         )
         XCTAssertEqual(
             RelativeTimeText.countdown(to: now.addingTimeInterval(4 * 3_600 + 18 * 60), now: now),
-            "4 小时 18 分钟"
+            "4 hours 18 minutes"
         )
         XCTAssertEqual(
             RelativeTimeText.countdown(to: now.addingTimeInterval(42), now: now),
-            "不足 1 分钟"
+            "less than 1 minute"
         )
         XCTAssertEqual(RelativeTimeText.countdown(to: nil, now: now), "—")
     }
 
-    func testLastUpdatedUsesChineseRelativeText() {
-        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-10), now: now), "刚刚")
-        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-180), now: now), "3 分钟前")
-        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-7_200), now: now), "2 小时前")
-        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-172_800), now: now), "2 天前")
+    func testLastUpdatedUsesEnglishByDefault() {
+        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-10), now: now), "just now")
+        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-180), now: now), "3 minutes ago")
+        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-7_200), now: now), "2 hours ago")
+        XCTAssertEqual(RelativeTimeText.since(now.addingTimeInterval(-172_800), now: now), "2 days ago")
+    }
+
+    func testChineseRelativeTextRemainsAvailable() {
+        let localization = AppLocalization(language: .simplifiedChinese)
+
+        XCTAssertEqual(
+            RelativeTimeText.countdown(
+                to: now.addingTimeInterval(2 * 86_400 + 3 * 3_600),
+                now: now,
+                localization: localization
+            ),
+            "2 天 3 小时"
+        )
+        XCTAssertEqual(
+            RelativeTimeText.since(
+                now.addingTimeInterval(-180),
+                now: now,
+                localization: localization
+            ),
+            "3 分钟前"
+        )
     }
 }

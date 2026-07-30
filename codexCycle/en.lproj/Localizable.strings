@@ -1,0 +1,46 @@
+"menu.quota_header" = "Display Quota";
+"menu.five_hour_remaining" = "5-hour remaining";
+"menu.weekly_remaining" = "Weekly remaining";
+"menu.five_hour_short" = "5-hour";
+"menu.weekly_short" = "weekly";
+"menu.current_view" = "Current view     %@ (%@ data unavailable)";
+"menu.reset_countdown" = "Resets in        %@";
+"menu.last_updated" = "Last updated     %@";
+"menu.reason" = "Reason           %@";
+"menu.stale_suffix" = " (stale)";
+"menu.refresh" = "Refresh Now";
+"menu.refreshing" = "Refreshing…";
+"menu.login_disabled" = "Launch at Login Disabled";
+"menu.open_login_settings" = "Open Login Items Settings…";
+"menu.language_header" = "Language";
+"menu.language_english" = "English";
+"menu.language_simplified_chinese" = "简体中文";
+"menu.quit" = "Quit codexCycle";
+
+"relative.less_than_one_minute" = "less than 1 minute";
+"relative.just_now" = "just now";
+"relative.ago" = "%@ ago";
+"unit.day.one" = "%d day";
+"unit.day.other" = "%d days";
+"unit.hour.one" = "%d hour";
+"unit.hour.other" = "%d hours";
+"unit.minute.one" = "%d minute";
+"unit.minute.other" = "%d minutes";
+
+"error.runtime_not_found" = "Codex Runtime not found";
+"error.incompatible_runtime" = "Codex Runtime incompatible";
+"error.not_logged_in" = "Codex is not signed in";
+"error.supported_limits_missing" = "5-hour and weekly quotas unavailable";
+"error.network_failure" = "Network connection failed";
+"error.service_unavailable" = "Codex service temporarily unavailable";
+
+"diagnostic.login_launch" = "Launch at Login";
+"diagnostic.enabled" = "enabled";
+"diagnostic.disabled" = "disabled";
+"diagnostic.runtime" = "Codex Runtime";
+"diagnostic.runtime_version" = "Codex version";
+"diagnostic.five_hour_remaining" = "5-hour remaining";
+"diagnostic.five_hour_reset" = "5-hour reset timestamp";
+"diagnostic.weekly_remaining" = "Weekly remaining";
+"diagnostic.weekly_reset" = "Weekly reset timestamp";
+"diagnostic.failure" = "Diagnostic failed";

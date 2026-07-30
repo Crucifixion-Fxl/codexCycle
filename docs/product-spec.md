@@ -4,6 +4,8 @@
 
 `codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentage in the main Codex five-hour or weekly quota window. The five-hour view is the first-use default, and the user can switch the preferred view from the menu. It has no Dock icon, main window, notifications, telemetry, updater, or login flow.
 
+English is the first-use interface language. The user can switch between English and Simplified Chinese from the menu without restarting the app, and the app persists that selection.
+
 ## Supported environment
 
 - Personal use on the current Apple Silicon Mac.
@@ -75,45 +77,50 @@
 
 ## Menu
 
-The app has no main window. Clicking the indicator continues to open a Simplified Chinese menu. When both windows are available and five-hour is preferred:
+The app has no main window. Clicking the indicator opens the detail menu in the persisted interface language. On first use, the English menu appears. When both windows are available and five-hour is preferred:
 
 ```text
-显示限额
-✓ 5 小时余量   67%
-  周余量       42%
-重置倒计时     3 小时 18 分钟
-最后更新      3 分钟前
+Display Quota
+✓ 5-hour remaining   67%
+  Weekly remaining  42%
+Resets in            3 hours 18 minutes
+Last updated         3 minutes ago
 ────────────
-立即刷新
+Language
+✓ English
+  简体中文
 ────────────
-退出 codexCycle
+Refresh Now
+────────────
+Quit codexCycle
 ```
 
 During fallback, the checkmark still identifies the persisted preference and a separate row identifies the effective current view:
 
 ```text
-显示限额
-✓ 5 小时余量   —
-  周余量       42%
-当前显示       周余量（5 小时数据不可用）
-重置倒计时     2 天 3 小时
-最后更新       3 分钟前
+Display Quota
+✓ 5-hour remaining   —
+  Weekly remaining  42%
+Current view         Weekly remaining (5-hour data unavailable)
+Resets in            2 days 3 hours
+Last updated         3 minutes ago
 ```
 
 - The five-hour and weekly rows are clickable even when their data is unavailable. Other information rows are disabled; action rows are clickable.
-- The checkmark identifies the preferred view, not necessarily the current view. Show the `当前显示` explanation only while fallback makes the two views differ.
+- The checkmark identifies the preferred view, not necessarily the current view. Show the localized current-view explanation only while fallback makes the two views differ.
 - Both menu readings include `%`; an unavailable reading is `—`. The center indicator omits `%`.
 - The reset countdown and status colors always correspond to the current view and change immediately when the current view changes.
-- The reset countdown uses at most two units and no seconds: `2 天 3 小时`, `4 小时 18 分钟`, or `不足 1 分钟`.
+- The reset countdown uses at most two units and no seconds: `2 days 3 hours`, `4 hours 18 minutes`, or `less than 1 minute` in English, with equivalent Simplified Chinese text.
 - The menu recalculates relative times at least once per minute while the app runs.
 - A missing non-current window is shown only on its own row. A missing preferred window is also explained by the fallback row; neither case is a global error.
-- Errors add one short Chinese reason when both windows are unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, both supported limits missing, network failure, or Codex service unavailable.
-- If login launch is disabled, show that state and provide `打开登录项设置…`.
-- `退出 codexCycle` stops the current process but leaves launch-at-login registered.
+- Errors add one short localized reason when both windows are unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, both supported limits missing, network failure, or Codex service unavailable.
+- The Language rows remain available in both localizations. Switching language updates the open menu immediately and persists the choice; first use defaults to English.
+- If login launch is disabled, show that state and provide a localized action that opens Login Items Settings.
+- The localized `Quit codexCycle` action stops the current process but leaves launch-at-login registered.
 
 ## Cached state and failure behavior
 
-- Store only the preferred view, the last successful reading for each supported window, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. Each reading contains its percentage, reset timestamp, and fetch timestamp.
+- Store only the preferred view, interface language, the last successful reading for each supported window, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. Each reading contains its percentage, reset timestamp, and fetch timestamp.
 - Persist a window reading only when it has a reset timestamp.
 - On launch, restore each non-expired reading as gray and stale until a live refresh succeeds, then derive the current view from the restored preference and available readings.
 - Expire and discard each cached window independently at its own reset timestamp. If the current window expires while the other remains usable, apply the normal fallback rule.
@@ -131,7 +138,8 @@ During fallback, the checkmark still identifies the persisted preference and a s
 
 ## Build and repository
 
-- Initialize a local Git repository on `main`; do not configure or push a remote.
+- Keep the public GitHub repository on `main` and publish versioned releases
+  with an annotated tag and an arm64 DMG asset.
 - `make build` builds the Debug app.
 - `make test` runs automated tests.
 - `make install` builds Release and installs `/Applications/codexCycle.app`.
@@ -141,9 +149,9 @@ During fallback, the checkmark still identifies the persisted preference and a s
 
 ## Verification
 
-- Unit tests cover exact five-hour and weekly window selection in either field, remaining calculation, preferred/current view derivation, symmetric fallback, selection persistence, gradient bands, countdown formatting, independent cache expiration, partial availability, and error classification.
+- Unit tests cover exact five-hour and weekly window selection in either field, remaining calculation, preferred/current view derivation, symmetric fallback, selection persistence, English-default and Simplified-Chinese presentation, gradient bands, countdown formatting, independent cache expiration, partial availability, and error classification.
 - A fake JSONL app-server process covers initialization, timeout, process exit, sparse-update handling, and full-snapshot refresh without a real account.
-- Real acceptance verifies the default five-hour view, selectable and persisted weekly view, immediate refresh after selection, fallback explanation, automatic recovery to the preferred view, current-view reset refresh, indicator, menu, manual and periodic refresh, wake refresh, login launch, real quota percentages, independent cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
+- Real acceptance verifies the default English interface, live switching to persisted Simplified Chinese, default five-hour view, selectable and persisted weekly view, immediate refresh after selection, fallback explanation, automatic recovery to the preferred view, current-view reset refresh, indicator, menu, manual and periodic refresh, wake refresh, login launch, real quota percentages, independent cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
 - Reading limits must not start model work or consume model usage.
 - Idle operation must not continuously consume CPU.
 

@@ -127,6 +127,7 @@ final class AppPreferences {
         static let codexPath = "codex.path"
         static let codexVersion = "codex.version"
         static let preferredQuotaWindow = "usage.preferredQuotaWindow"
+        static let appLanguage = "display.language"
         static let attemptedLoginRegistration = "launchAtLogin.registrationAttempted"
     }
 
@@ -154,6 +155,17 @@ final class AppPreferences {
         }
         set {
             defaults.set(newValue.rawValue, forKey: Key.preferredQuotaWindow)
+        }
+    }
+
+    var appLanguage: AppLanguage {
+        get {
+            defaults.string(forKey: Key.appLanguage)
+                .flatMap(AppLanguage.init(rawValue:))
+                ?? .english
+        }
+        set {
+            defaults.set(newValue.rawValue, forKey: Key.appLanguage)
         }
     }
 

@@ -177,15 +177,19 @@ final class InfrastructureTests: XCTestCase {
     func testStableErrorClassification() {
         XCTAssertEqual(DisplayErrorReason.classify(CodexLocatorError.notFound), .runtimeNotFound)
         XCTAssertEqual(
-            DisplayErrorReason.classify(CodexLocatorError.notFound).rawValue,
-            "未找到 Codex Runtime"
+            AppLocalization(language: .english).text(
+                DisplayErrorReason.classify(CodexLocatorError.notFound).localizationKey
+            ),
+            "Codex Runtime not found"
         )
         XCTAssertEqual(
             DisplayErrorReason.classify(CodexLocatorError.incompatible),
             .incompatibleRuntime
         )
         XCTAssertEqual(
-            DisplayErrorReason.classify(CodexLocatorError.incompatible).rawValue,
+            AppLocalization(language: .simplifiedChinese).text(
+                DisplayErrorReason.classify(CodexLocatorError.incompatible).localizationKey
+            ),
             "Codex Runtime 不兼容"
         )
         XCTAssertEqual(
@@ -339,15 +343,30 @@ final class InfrastructureTests: XCTestCase {
         let presentation = controller.presentationSnapshot
 
         XCTAssertEqual(presentation.indicatorRemainingPercent, 42)
+        XCTAssertEqual(presentation.language, .english)
+        XCTAssertEqual(presentation.quotaHeaderTitle, "Display Quota")
         XCTAssertTrue(presentation.fiveHourIsPreferred)
         XCTAssertFalse(presentation.weeklyIsPreferred)
-        XCTAssertEqual(presentation.fiveHourTitle, "5 小时余量      —")
-        XCTAssertEqual(presentation.weeklyTitle, "周余量      42%")
+        XCTAssertEqual(presentation.fiveHourTitle, "5-hour remaining      —")
+        XCTAssertEqual(presentation.weeklyTitle, "Weekly remaining      42%")
         XCTAssertEqual(
             presentation.currentViewTitle,
+            "Current view     Weekly remaining (5-hour data unavailable)"
+        )
+        XCTAssertEqual(presentation.resetTitle, "Resets in        1 day")
+
+        controller.setLanguage(.simplifiedChinese, now: now)
+        let chinesePresentation = controller.presentationSnapshot
+
+        XCTAssertEqual(chinesePresentation.language, .simplifiedChinese)
+        XCTAssertEqual(chinesePresentation.quotaHeaderTitle, "显示限额")
+        XCTAssertEqual(chinesePresentation.fiveHourTitle, "5 小时余量      —")
+        XCTAssertEqual(chinesePresentation.weeklyTitle, "周余量      42%")
+        XCTAssertEqual(
+            chinesePresentation.currentViewTitle,
             "当前显示      周余量（5 小时数据不可用）"
         )
-        XCTAssertEqual(presentation.resetTitle, "重置倒计时    1 天")
+        XCTAssertEqual(chinesePresentation.resetTitle, "重置倒计时    1 天")
     }
 
     private func assertDesktopRuntimeIsRejected(

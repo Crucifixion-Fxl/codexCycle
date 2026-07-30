@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let locator = CodexLocator(preferences: preferences)
         let service = CodexUsageService(locator: locator, preferences: preferences)
-        let menuController = StatusMenuController()
+        let menuController = StatusMenuController(language: preferences.appLanguage)
         let coordinator = RefreshCoordinator(
             service: service,
             cache: UserDefaultsUsageCache(),
@@ -70,29 +70,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func runDiagnostic(preferences: AppPreferences) {
         let locator = CodexLocator(preferences: preferences)
         let service = CodexUsageService(locator: locator, preferences: preferences)
+        let localization = AppLocalization(language: preferences.appLanguage)
         diagnosticService = service
         let loginState = LoginItemManager(preferences: preferences).state
-        print("登录启动: \(loginState == .enabled ? "已启用" : "已禁用")")
+        let loginStateText = localization.text(
+            loginState == .enabled ? "diagnostic.enabled" : "diagnostic.disabled"
+        )
+        print("\(localization.text("diagnostic.login_launch")): \(loginStateText)")
 
         service.fetch { [weak self] result in
             switch result {
             case .success(let snapshot):
-                print("Codex Runtime: \(preferences.selectedCodexPath ?? "—")")
-                print("Codex 版本: \(preferences.selectedCodexVersion ?? "—")")
                 print(
-                    "5 小时余量: \(snapshot.fiveHour.map { "\($0.remainingPercent)%" } ?? "—")"
+                    "\(localization.text("diagnostic.runtime")): "
+                        + "\(preferences.selectedCodexPath ?? "—")"
                 )
                 print(
-                    "5 小时重置时间戳: \(snapshot.fiveHour?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                    "\(localization.text("diagnostic.runtime_version")): "
+                        + "\(preferences.selectedCodexVersion ?? "—")"
                 )
                 print(
-                    "周余量: \(snapshot.weekly.map { "\($0.remainingPercent)%" } ?? "—")"
+                    "\(localization.text("diagnostic.five_hour_remaining")): "
+                        + "\(snapshot.fiveHour.map { "\($0.remainingPercent)%" } ?? "—")"
                 )
                 print(
-                    "周重置时间戳: \(snapshot.weekly?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                    "\(localization.text("diagnostic.five_hour_reset")): "
+                        + "\(snapshot.fiveHour?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                )
+                print(
+                    "\(localization.text("diagnostic.weekly_remaining")): "
+                        + "\(snapshot.weekly.map { "\($0.remainingPercent)%" } ?? "—")"
+                )
+                print(
+                    "\(localization.text("diagnostic.weekly_reset")): "
+                        + "\(snapshot.weekly?.resetsAt?.timeIntervalSince1970.description ?? "—")"
                 )
             case .failure(let error):
-                print("诊断失败: \(String(reflecting: error))")
+                print(
+                    "\(localization.text("diagnostic.failure")): \(String(reflecting: error))"
+                )
             }
             fflush(stdout)
             self?.diagnosticService = nil
