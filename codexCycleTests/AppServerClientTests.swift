@@ -205,7 +205,7 @@ final class AppServerClientTests: XCTestCase {
             .appendingPathComponent("codexCycle-env-fake-\(UUID().uuidString)")
         let binURL = rootURL.appendingPathComponent("bin")
         let packageURL = rootURL.appendingPathComponent("package")
-        let interpreterURL = binURL.appendingPathComponent("codexcycle-test-node")
+        let interpreterURL = binURL.appendingPathComponent("node")
         let scriptURL = packageURL.appendingPathComponent("codex.js")
         try FileManager.default.createDirectory(
             at: binURL,
@@ -220,7 +220,7 @@ final class AppServerClientTests: XCTestCase {
             atomically: true,
             encoding: .utf8
         )
-        try ("#!/usr/bin/env codexcycle-test-node\n" + body + "\n").write(
+        try ("#!/usr/bin/env node\n" + body + "\n").write(
             to: scriptURL,
             atomically: true,
             encoding: .utf8

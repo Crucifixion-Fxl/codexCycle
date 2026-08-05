@@ -340,8 +340,19 @@ final class CodexLocator {
                 .compactMap(self.validatedCandidate)
                 .reduce(into: [String: CodexCandidate]()) { result, candidate in
                     let path = candidate.executableURL.path
-                    if let existing = result[path], existing.source <= candidate.source {
-                        return
+                    if let existing = result[path] {
+                        if existing.source < candidate.source {
+                            return
+                        }
+                        if existing.source == candidate.source {
+                            let existingPreservesLauncher =
+                                existing.launcherURL != existing.executableURL
+                            let candidatePreservesLauncher =
+                                candidate.launcherURL != candidate.executableURL
+                            if existingPreservesLauncher || !candidatePreservesLauncher {
+                                return
+                            }
+                        }
                     }
                     result[path] = candidate
                 }
@@ -509,14 +520,6 @@ final class CodexLocator {
 
         let resolvedURL = originalURL.resolvingSymlinksInPath().standardizedFileURL
         let launcherURL = originalURL.standardizedFileURL
-        let isIndependentScript = location.source == .independentCLI
-            && isScriptExecutable(resolvedURL)
-        let executableSearchPath = CodexProcessSearchPath.searchPath(
-            inherited: environment.executableSearchPath,
-            executableDirectory: isIndependentScript
-                ? launcherURL.deletingLastPathComponent()
-                : nil
-        )
         let path = resolvedURL.path
         let originalPath = launcherURL.path
         let home = fileManager.homeDirectoryForCurrentUser.path
@@ -542,8 +545,26 @@ final class CodexLocator {
             values.isRegularFile == true,
             values.volumeIsLocal != false,
             values.volumeIsRemovable != true,
-            hasSafeOwnershipAndPermissions(resolvedURL),
-            !isIndependentScript || hasSafeExecutableSearchPath(launcherURL),
+            hasSafeOwnershipAndPermissions(resolvedURL)
+        else {
+            return nil
+        }
+
+        let independentShebang = location.source == .independentCLI
+            ? scriptShebang(at: resolvedURL)
+            : nil
+        if let independentShebang, independentShebang != "#!/usr/bin/env node" {
+            return nil
+        }
+        let isIndependentScript = independentShebang != nil
+        let executableDirectory = isIndependentScript
+            ? launcherURL.deletingLastPathComponent()
+            : nil
+        guard
+            let executableSearchPath = trustedExecutableSearchPath(
+                prepending: executableDirectory
+            ),
+            !isIndependentScript || hasTrustedNodeInterpreter(in: executableSearchPath),
             hasRequiredCodeSignature(
                 for: location,
                 resolvedExecutableURL: resolvedURL,
@@ -610,8 +631,47 @@ final class CodexLocator {
         return true
     }
 
-    private func hasSafeExecutableSearchPath(_ launcherURL: URL) -> Bool {
-        let directoryURL = launcherURL.deletingLastPathComponent()
+    private func trustedExecutableSearchPath(prepending directoryURL: URL?) -> String? {
+        let requestedPath = CodexProcessSearchPath.searchPath(
+            inherited: environment.executableSearchPath,
+            executableDirectory: directoryURL
+        )
+        let fallbackPath = CodexProcessSearchPath.searchPath(
+            inherited: "",
+            executableDirectory: nil
+        )
+        let requiredDirectory = directoryURL?
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
+        var seen = Set<String>()
+        let trustedDirectories = (requestedPath + ":" + fallbackPath)
+            .split(separator: ":")
+            .map(String.init)
+            .compactMap { path -> String? in
+                guard path.hasPrefix("/") else { return nil }
+                let url = URL(fileURLWithPath: path, isDirectory: true)
+                    .resolvingSymlinksInPath()
+                    .standardizedFileURL
+                guard
+                    hasSafeExecutableDirectory(url),
+                    seen.insert(url.path).inserted
+                else {
+                    return nil
+                }
+                return url.path
+            }
+
+        if let requiredDirectory, !trustedDirectories.contains(requiredDirectory) {
+            return nil
+        }
+        guard !trustedDirectories.isEmpty else {
+            return nil
+        }
+        return trustedDirectories.joined(separator: ":")
+    }
+
+    private func hasSafeExecutableDirectory(_ directoryURL: URL) -> Bool {
         let keys: Set<URLResourceKey> = [
             .isDirectoryKey,
             .volumeIsLocalKey,
@@ -656,6 +716,38 @@ final class CodexLocator {
         return true
     }
 
+    private func hasTrustedNodeInterpreter(in executableSearchPath: String) -> Bool {
+        executableSearchPath
+            .split(separator: ":")
+            .map(String.init)
+            .contains { directory in
+                let interpreterURL = URL(fileURLWithPath: directory, isDirectory: true)
+                    .appendingPathComponent("node")
+                    .resolvingSymlinksInPath()
+                    .standardizedFileURL
+                guard fileManager.isExecutableFile(atPath: interpreterURL.path) else {
+                    return false
+                }
+                let keys: Set<URLResourceKey> = [
+                    .isRegularFileKey,
+                    .volumeIsLocalKey,
+                    .volumeIsRemovableKey
+                ]
+                guard
+                    let values = try? interpreterURL.resourceValues(forKeys: keys),
+                    values.isRegularFile == true,
+                    values.volumeIsLocal != false,
+                    values.volumeIsRemovable != true,
+                    hasSafeExecutableDirectory(
+                        interpreterURL.deletingLastPathComponent()
+                    )
+                else {
+                    return false
+                }
+                return hasSafeOwnershipAndPermissions(interpreterURL)
+            }
+    }
+
     private func hasRequiredCodeSignature(
         for location: RuntimeLocation,
         resolvedExecutableURL: URL,
@@ -681,12 +773,24 @@ final class CodexLocator {
         return true
     }
 
-    private func isScriptExecutable(_ executableURL: URL) -> Bool {
+    private func scriptShebang(at executableURL: URL) -> String? {
         guard let handle = try? FileHandle(forReadingFrom: executableURL) else {
-            return false
+            return nil
         }
         defer { try? handle.close() }
-        return handle.readData(ofLength: 2) == Data([0x23, 0x21])
+        let data = handle.readData(ofLength: 256)
+        guard
+            let text = String(data: data, encoding: .utf8),
+            text.hasPrefix("#!")
+        else {
+            return nil
+        }
+        return text
+            .split(maxSplits: 1, whereSeparator: \.isNewline)
+            .first
+            .map {
+                String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
     }
 
     private func bundleIdentifier(at applicationURL: URL) -> String? {
