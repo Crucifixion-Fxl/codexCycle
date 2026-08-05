@@ -3,9 +3,11 @@ import Foundation
 import Security
 
 struct CodexCandidate: Equatable {
+    let launcherURL: URL
     let executableURL: URL
     let version: SemanticVersion
     let source: CodexRuntimeSource
+    let executableSearchPath: String
 }
 
 enum CodexRuntimeSource: Int, Comparable {
@@ -92,19 +94,50 @@ struct CommandOutput {
     let stderr: String
 }
 
+enum CodexProcessSearchPath {
+    static func searchPath(
+        inherited: String,
+        executableDirectory: URL? = nil
+    ) -> String {
+        let inheritedPath = inherited.isEmpty
+            ? "/usr/bin:/bin:/usr/sbin:/sbin"
+            : inherited
+        let inheritedDirectories = inheritedPath
+            .split(separator: ":")
+            .map(String.init)
+        let candidateDirectory = executableDirectory?
+            .standardizedFileURL
+            .path
+
+        var seen = Set<String>()
+        return ([candidateDirectory].compactMap { $0 } + inheritedDirectories)
+            .filter { seen.insert($0).inserted }
+            .joined(separator: ":")
+    }
+}
+
 enum CommandRunner {
     static func run(
         executableURL: URL,
         arguments: [String],
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        executableSearchPath: String? = nil
     ) -> Result<CommandOutput, Error> {
         let process = Process()
         let stdout = Pipe()
         let stderr = Pipe()
         let finished = DispatchSemaphore(value: 0)
 
-        process.executableURL = executableURL
-        process.arguments = arguments
+        if let executableSearchPath {
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [
+                "PATH=\(executableSearchPath)",
+                executableURL.path
+            ] + arguments
+        } else {
+            process.executableURL = executableURL
+            process.arguments = arguments
+        }
         process.standardOutput = stdout
         process.standardError = stderr
         process.terminationHandler = { _ in finished.signal() }
@@ -188,21 +221,34 @@ struct CodexLocatorEnvironment {
     let executableSearchPath: String
     let homeDirectory: URL
     let applicationDirectories: [URL]
-    let runCommand: (URL, [String], TimeInterval) -> Result<CommandOutput, Error>
+    let runCommand: (
+        URL,
+        [String],
+        TimeInterval,
+        String
+    ) -> Result<CommandOutput, Error>
     let isCodeSignatureValid: (URL, CodexCodeSignatureRequirement) -> Bool
     let spotlightExecutablePaths: () -> Set<String>
     let spotlightApplicationPaths: () -> Set<String>
 
     static func live(fileManager: FileManager) -> CodexLocatorEnvironment {
         let homeDirectory = fileManager.homeDirectoryForCurrentUser
+        let executableSearchPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
         return CodexLocatorEnvironment(
-            executableSearchPath: ProcessInfo.processInfo.environment["PATH"] ?? "",
+            executableSearchPath: executableSearchPath,
             homeDirectory: homeDirectory,
             applicationDirectories: [
                 URL(fileURLWithPath: "/Applications", isDirectory: true),
                 homeDirectory.appendingPathComponent("Applications", isDirectory: true)
             ],
-            runCommand: CommandRunner.run,
+            runCommand: { executableURL, arguments, timeout, executableSearchPath in
+                CommandRunner.run(
+                    executableURL: executableURL,
+                    arguments: arguments,
+                    timeout: timeout,
+                    executableSearchPath: executableSearchPath
+                )
+            },
             isCodeSignatureValid: CodeSignatureValidator.isValid,
             spotlightExecutablePaths: {
                 spotlightPaths(query: "kMDItemFSName == 'codex'cd")
@@ -294,7 +340,7 @@ final class CodexLocator {
                 .compactMap(self.validatedCandidate)
                 .reduce(into: [String: CodexCandidate]()) { result, candidate in
                     let path = candidate.executableURL.path
-                    if let existing = result[path], existing.source < candidate.source {
+                    if let existing = result[path], existing.source <= candidate.source {
                         return
                     }
                     result[path] = candidate
@@ -462,10 +508,23 @@ final class CodexLocator {
         }
 
         let resolvedURL = originalURL.resolvingSymlinksInPath().standardizedFileURL
+        let launcherURL = originalURL.standardizedFileURL
+        let isIndependentScript = location.source == .independentCLI
+            && isScriptExecutable(resolvedURL)
+        let executableSearchPath = CodexProcessSearchPath.searchPath(
+            inherited: environment.executableSearchPath,
+            executableDirectory: isIndependentScript
+                ? launcherURL.deletingLastPathComponent()
+                : nil
+        )
         let path = resolvedURL.path
+        let originalPath = launcherURL.path
         let home = fileManager.homeDirectoryForCurrentUser.path
 
-        if path.hasPrefix(home + "/Downloads/") || path.hasPrefix("/Volumes/") {
+        if path.hasPrefix(home + "/Downloads/")
+            || path.hasPrefix("/Volumes/")
+            || originalPath.hasPrefix(home + "/Downloads/")
+            || originalPath.hasPrefix("/Volumes/") {
             return nil
         }
 
@@ -484,7 +543,12 @@ final class CodexLocator {
             values.volumeIsLocal != false,
             values.volumeIsRemovable != true,
             hasSafeOwnershipAndPermissions(resolvedURL),
-            hasRequiredCodeSignature(for: location, resolvedExecutableURL: resolvedURL)
+            !isIndependentScript || hasSafeExecutableSearchPath(launcherURL),
+            hasRequiredCodeSignature(
+                for: location,
+                resolvedExecutableURL: resolvedURL,
+                isIndependentScript: isIndependentScript
+            )
         else {
             return nil
         }
@@ -492,7 +556,8 @@ final class CodexLocator {
         guard case .success(let output) = environment.runCommand(
             resolvedURL,
             ["--version"],
-            5
+            5,
+            executableSearchPath
         ), output.status == 0 else {
             return nil
         }
@@ -503,9 +568,11 @@ final class CodexLocator {
         }
 
         return CodexCandidate(
+            launcherURL: launcherURL,
             executableURL: resolvedURL,
             version: version,
-            source: location.source
+            source: location.source,
+            executableSearchPath: executableSearchPath
         )
     }
 
@@ -524,7 +591,11 @@ final class CodexLocator {
             return false
         }
 
-        var parent = executableURL.deletingLastPathComponent()
+        return hasSafeAncestorPermissions(executableURL)
+    }
+
+    private func hasSafeAncestorPermissions(_ executableURL: URL) -> Bool {
+        var parent = executableURL.standardizedFileURL.deletingLastPathComponent()
         while parent.path != "/" {
             guard
                 let parentAttributes = try? fileManager.attributesOfItem(atPath: parent.path),
@@ -539,11 +610,63 @@ final class CodexLocator {
         return true
     }
 
+    private func hasSafeExecutableSearchPath(_ launcherURL: URL) -> Bool {
+        let directoryURL = launcherURL.deletingLastPathComponent()
+        let keys: Set<URLResourceKey> = [
+            .isDirectoryKey,
+            .volumeIsLocalKey,
+            .volumeIsRemovableKey
+        ]
+        guard let values = try? directoryURL.resourceValues(forKeys: keys) else {
+            return false
+        }
+        guard values.isDirectory == true
+            && values.volumeIsLocal != false
+            && values.volumeIsRemovable != true
+        else {
+            return false
+        }
+
+        let currentUserID = getuid()
+        var directory = directoryURL.standardizedFileURL
+        while directory.path != "/" {
+            guard
+                let attributes = try? fileManager.attributesOfItem(atPath: directory.path),
+                let owner = attributes[.ownerAccountID] as? NSNumber,
+                let permissions = attributes[.posixPermissions] as? NSNumber
+            else {
+                return false
+            }
+
+            let mode = permissions.intValue
+            guard mode & 0o002 == 0 else {
+                return false
+            }
+            if mode & 0o020 != 0 {
+                let isUserOwnedHomebrewDirectory = owner.uint32Value == currentUserID
+                    && (directory.path == "/opt/homebrew"
+                        || directory.path.hasPrefix("/opt/homebrew/"))
+                guard isUserOwnedHomebrewDirectory else {
+                    return false
+                }
+            }
+            directory.deleteLastPathComponent()
+        }
+
+        return true
+    }
+
     private func hasRequiredCodeSignature(
         for location: RuntimeLocation,
-        resolvedExecutableURL: URL
+        resolvedExecutableURL: URL,
+        isIndependentScript: Bool
     ) -> Bool {
         guard location.source != .independentCLI else {
+            // Script launchers have no Mach-O signature; their ownership and
+            // ancestor-directory checks still apply before this point.
+            if isIndependentScript {
+                return true
+            }
             return environment.isCodeSignatureValid(resolvedExecutableURL, .integrity)
         }
 
@@ -556,6 +679,14 @@ final class CodexLocator {
             return false
         }
         return true
+    }
+
+    private func isScriptExecutable(_ executableURL: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: executableURL) else {
+            return false
+        }
+        defer { try? handle.close() }
+        return handle.readData(ofLength: 2) == Data([0x23, 0x21])
     }
 
     private func bundleIdentifier(at applicationURL: URL) -> String? {
