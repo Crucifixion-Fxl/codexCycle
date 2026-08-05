@@ -5,10 +5,18 @@ struct AppServerLaunchConfiguration {
     let executableURL: URL
     let arguments: [String]
 
-    static func codex(at executableURL: URL) -> AppServerLaunchConfiguration {
+    static func codex(
+        at executableURL: URL,
+        executableSearchPath: String
+    ) -> AppServerLaunchConfiguration {
         AppServerLaunchConfiguration(
-            executableURL: executableURL,
-            arguments: ["app-server", "--stdio"]
+            executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "PATH=\(executableSearchPath)",
+                executableURL.path,
+                "app-server",
+                "--stdio"
+            ]
         )
     }
 }
