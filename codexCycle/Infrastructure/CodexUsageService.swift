@@ -146,7 +146,10 @@ final class CodexUsageService {
 
         let candidate = candidates[index]
         let candidateClient = AppServerClient(
-            configuration: .codex(at: candidate.executableURL)
+            configuration: .codex(
+                at: candidate.executableURL,
+                executableSearchPath: candidate.executableSearchPath
+            )
         )
 
         candidateClient.onRateLimitsUpdated = { [weak self] in
@@ -167,7 +170,7 @@ final class CodexUsageService {
                     switch response {
                     case .success(let payload):
                         self.client = candidateClient
-                        self.preferences.selectedCodexPath = candidate.executableURL.path
+                        self.preferences.selectedCodexPath = candidate.launcherURL.path
                         self.preferences.selectedCodexVersion = candidate.version.description
                         do {
                             let snapshot = try QuotaUsageParser.parse(payload)
@@ -182,7 +185,7 @@ final class CodexUsageService {
                         } else {
                             // The protocol is present even if account or network state blocks this read.
                             self.client = candidateClient
-                            self.preferences.selectedCodexPath = candidate.executableURL.path
+                            self.preferences.selectedCodexPath = candidate.launcherURL.path
                             self.preferences.selectedCodexVersion = candidate.version.description
                             self.finishConnection(.failure(error))
                         }
