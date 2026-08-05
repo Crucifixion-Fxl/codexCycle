@@ -73,6 +73,153 @@ final class InfrastructureTests: XCTestCase {
         wait(for: [discovered], timeout: 5)
     }
 
+    func testUnsignedScriptRuntimeKeepsLauncherPathAcrossDiscovery() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+
+        let runtime = try fixture.makeEnvironmentDependentIndependentRuntime(
+            version: "0.150.0"
+        )
+        fixture.useRealCommands()
+        fixture.rejectSignature(at: runtime.resolvedURL)
+
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)")
+        )
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.selectedCodexPath = runtime.launcherURL.path
+        let locator = CodexLocator(
+            fileManager: .default,
+            preferences: preferences,
+            environment: fixture.environment
+        )
+        let rediscovered = expectation(description: "Script Runtime rediscovered")
+
+        locator.discover { result in
+            do {
+                let candidate = try XCTUnwrap(
+                    result.get().first {
+                        $0.executableURL == runtime.resolvedURL
+                    }
+                )
+                XCTAssertEqual(candidate.launcherURL, runtime.launcherURL)
+                XCTAssertEqual(candidate.executableURL, runtime.resolvedURL)
+                XCTAssertEqual(
+                    candidate.executableSearchPath
+                        .split(separator: ":")
+                        .first
+                        .map(String.init),
+                    runtime.binURL.path
+                )
+
+                preferences.selectedCodexPath = candidate.launcherURL.path
+                let relaunchedLocator = CodexLocator(
+                    fileManager: .default,
+                    preferences: preferences,
+                    environment: fixture.environment
+                )
+                relaunchedLocator.discover { relaunchedResult in
+                    do {
+                        let relaunchedCandidate = try XCTUnwrap(
+                            relaunchedResult.get().first {
+                                $0.executableURL == runtime.resolvedURL
+                            }
+                        )
+                        XCTAssertEqual(
+                            relaunchedCandidate.launcherURL,
+                            runtime.launcherURL
+                        )
+                        XCTAssertEqual(
+                            relaunchedCandidate.executableSearchPath
+                                .split(separator: ":")
+                                .first
+                                .map(String.init),
+                            runtime.binURL.path
+                        )
+                    } catch {
+                        XCTFail("Unexpected rediscovery error: \(error)")
+                    }
+                    rediscovered.fulfill()
+                }
+            } catch {
+                XCTFail("Unexpected discovery error: \(error)")
+                rediscovered.fulfill()
+            }
+        }
+
+        wait(for: [rediscovered], timeout: 5)
+    }
+
+    func testRejectsScriptRuntimeFromGroupWritableNonHomebrewBin() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+
+        let runtime = try fixture.makeEnvironmentDependentIndependentRuntime(
+            version: "0.150.0"
+        )
+        fixture.rejectSignature(at: runtime.resolvedURL)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o770],
+            ofItemAtPath: runtime.binURL.path
+        )
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)")
+        )
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.selectedCodexPath = runtime.launcherURL.path
+        let locator = CodexLocator(
+            fileManager: .default,
+            preferences: preferences,
+            environment: fixture.environment
+        )
+        let rejected = expectation(description: "Unsafe script bin rejected")
+
+        locator.discover { result in
+            if case .success(let candidates) = result {
+                XCTAssertFalse(
+                    candidates.contains {
+                        $0.executableURL == runtime.resolvedURL
+                    }
+                )
+            }
+            rejected.fulfill()
+        }
+
+        wait(for: [rejected], timeout: 5)
+    }
+
+    func testRejectsUnsignedNativeIndependentRuntime() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+
+        let executableURL = try fixture.makeIndependentNativeRuntime(
+            version: "0.150.0"
+        )
+        fixture.rejectSignature(at: executableURL)
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)")
+        )
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.selectedCodexPath = executableURL.path
+        let locator = CodexLocator(
+            fileManager: .default,
+            preferences: preferences,
+            environment: fixture.environment
+        )
+        let rejected = expectation(description: "Unsigned native Runtime rejected")
+
+        locator.discover { result in
+            guard case .failure(CodexLocatorError.incompatible) = result else {
+                XCTFail("Expected incompatible Runtime, got \(result)")
+                rejected.fulfill()
+                return
+            }
+            rejected.fulfill()
+        }
+
+        wait(for: [rejected], timeout: 5)
+    }
+
     func testRejectsDesktopRuntimeWhenApplicationSignatureIsInvalid() throws {
         let fixture = try RuntimeDiscoveryFixture()
         defer { fixture.remove() }
@@ -402,12 +549,21 @@ private final class RuntimeDiscoveryFixture {
     let homeURL: URL
     private var versions: [String: String] = [:]
     private var rejectedSignaturePaths = Set<String>()
+    private var runsRealCommands = false
 
     lazy var environment = CodexLocatorEnvironment(
         executableSearchPath: "",
         homeDirectory: homeURL,
         applicationDirectories: [applicationsURL],
-        runCommand: { [weak self] executableURL, arguments, _ in
+        runCommand: { [weak self] executableURL, arguments, timeout, searchPath in
+            if self?.runsRealCommands == true {
+                return CommandRunner.run(
+                    executableURL: executableURL,
+                    arguments: arguments,
+                    timeout: timeout,
+                    executableSearchPath: searchPath
+                )
+            }
             guard
                 arguments == ["--version"],
                 let version = self?.versions[executableURL.path]
@@ -489,6 +645,67 @@ private final class RuntimeDiscoveryFixture {
         )
         versions[executableURL.path] = version
         return executableURL
+    }
+
+    func makeIndependentNativeRuntime(version: String) throws -> URL {
+        let binURL = rootURL.appendingPathComponent("native-bin")
+        let executableURL = binURL.appendingPathComponent("codex")
+        try FileManager.default.createDirectory(
+            at: binURL,
+            withIntermediateDirectories: true
+        )
+        try Data([0xcf, 0xfa, 0xed, 0xfe]).write(to: executableURL)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: executableURL.path
+        )
+        versions[executableURL.path] = version
+        return executableURL
+    }
+
+    func makeEnvironmentDependentIndependentRuntime(
+        version: String
+    ) throws -> (launcherURL: URL, resolvedURL: URL, binURL: URL) {
+        let binURL = rootURL.appendingPathComponent("environment-bin")
+        let packageURL = rootURL.appendingPathComponent("package")
+        let launcherURL = binURL.appendingPathComponent("codex")
+        let interpreterURL = binURL.appendingPathComponent("codexcycle-test-node")
+        let resolvedURL = packageURL.appendingPathComponent("codex.js")
+        try FileManager.default.createDirectory(
+            at: binURL,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: packageURL,
+            withIntermediateDirectories: true
+        )
+        try "#!/bin/sh\nexec /bin/sh \"$@\"\n".write(
+            to: interpreterURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try """
+        #!/usr/bin/env codexcycle-test-node
+        printf 'codex-cli \(version)\\n'
+        """.write(to: resolvedURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: interpreterURL.path
+        )
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: resolvedURL.path
+        )
+        try FileManager.default.createSymbolicLink(
+            at: launcherURL,
+            withDestinationURL: resolvedURL
+        )
+        versions[resolvedURL.path] = version
+        return (launcherURL, resolvedURL, binURL)
+    }
+
+    func useRealCommands() {
+        runsRealCommands = true
     }
 
     func rejectSignature(at url: URL) {

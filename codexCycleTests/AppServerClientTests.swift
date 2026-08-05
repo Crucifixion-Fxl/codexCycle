@@ -60,6 +60,52 @@ final class AppServerClientTests: XCTestCase {
         client.stop()
     }
 
+    func testCodexLaunchUsesCandidateSearchPathForEnvInterpreter() throws {
+        let fixture = try makeEnvironmentDependentScript(
+            body: """
+            while IFS= read -r line; do
+              case "$line" in
+                *rateLimits*)
+                  printf '%s\\n' '{"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":25,"windowDurationMins":300,"resetsAt":1800010000},"secondary":null},"rateLimitsByLimitId":null}}'
+                  ;;
+                *initialized*)
+                  ;;
+                *initialize*)
+                  printf '%s\\n' '{"id":1,"result":{"userAgent":"fake/1"}}'
+                  ;;
+              esac
+            done
+            """
+        )
+        let client = AppServerClient(
+            configuration: .codex(
+                at: fixture.scriptURL,
+                executableSearchPath: fixture.executableSearchPath
+            )
+        )
+        let read = expectation(description: "environment-dependent Runtime read")
+
+        client.start { result in
+            if case .failure(let error) = result {
+                XCTFail("Unexpected startup error: \(error)")
+                read.fulfill()
+                return
+            }
+            client.readRateLimits { response in
+                do {
+                    let payload = try response.get()
+                    XCTAssertEqual(payload.rateLimits.primary?.usedPercent, 25)
+                } catch {
+                    XCTFail("Unexpected read error: \(error)")
+                }
+                read.fulfill()
+            }
+        }
+
+        wait(for: [read], timeout: 5)
+        client.stop()
+    }
+
     func testReadTimesOutWhenServerDoesNotRespond() throws {
         let script = try makeScript(
             body: """
@@ -150,5 +196,48 @@ final class AppServerClientTests: XCTestCase {
         )
         temporaryScripts.append(url)
         return url
+    }
+
+    private func makeEnvironmentDependentScript(
+        body: String
+    ) throws -> (scriptURL: URL, executableSearchPath: String) {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("codexCycle-env-fake-\(UUID().uuidString)")
+        let binURL = rootURL.appendingPathComponent("bin")
+        let packageURL = rootURL.appendingPathComponent("package")
+        let interpreterURL = binURL.appendingPathComponent("codexcycle-test-node")
+        let scriptURL = packageURL.appendingPathComponent("codex.js")
+        try FileManager.default.createDirectory(
+            at: binURL,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: packageURL,
+            withIntermediateDirectories: true
+        )
+        try "#!/bin/sh\nexec /bin/sh \"$@\"\n".write(
+            to: interpreterURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        try ("#!/usr/bin/env codexcycle-test-node\n" + body + "\n").write(
+            to: scriptURL,
+            atomically: true,
+            encoding: .utf8
+        )
+        for url in [interpreterURL, scriptURL] {
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: url.path
+            )
+        }
+        temporaryScripts.append(rootURL)
+        return (
+            scriptURL,
+            CodexProcessSearchPath.searchPath(
+                inherited: "/usr/bin:/bin:/usr/sbin:/sbin",
+                executableDirectory: binURL
+            )
+        )
     }
 }
