@@ -886,7 +886,7 @@ private final class RuntimeDiscoveryFixture {
           while IFS= read -r line; do
             case "$line" in
               *rateLimits*)
-                printf '%s\\n' '{"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":25,"windowDurationMins":300,"resetsAt":1800010000},"secondary":null},"rateLimitsByLimitId":null}}'
+                printf '%s\\n' '{"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":25,"windowDurationMins":10080,"resetsAt":1800010000},"secondary":null},"rateLimitsByLimitId":null}}'
                 ;;
               *initialized*)
                 ;;
