@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		A00000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000001 /* AppDelegate.swift */; };
 		A00000000000000000000002 /* RateLimitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000002 /* RateLimitModels.swift */; };
-		A00000000000000000000003 /* QuotaUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* QuotaUsage.swift */; };
+		A00000000000000000000003 /* WeeklyQuota.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000003 /* WeeklyQuota.swift */; };
 		A00000000000000000000004 /* AppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000004 /* AppServerClient.swift */; };
 		A00000000000000000000005 /* CodexLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000005 /* CodexLocator.swift */; };
 		A00000000000000000000006 /* CodexUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000006 /* CodexUsageService.swift */; };
@@ -23,9 +23,9 @@
 		A0000000000000000000000E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F0000000000000000000000F /* Assets.xcassets */; };
 		A00000000000000000000016 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000016 /* AppLocalization.swift */; };
 		A00000000000000000000017 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = V00000000000000000000001 /* Localizable.strings */; };
-		A00000000000000000000011 /* QuotaUsageParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* QuotaUsageParserTests.swift */; };
+		A00000000000000000000011 /* WeeklyQuotaParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000011 /* WeeklyQuotaParserTests.swift */; };
 		A00000000000000000000012 /* RelativeTimeFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000012 /* RelativeTimeFormatterTests.swift */; };
-		A00000000000000000000013 /* UsageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* UsageCacheTests.swift */; };
+		A00000000000000000000013 /* WeeklyQuotaCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000013 /* WeeklyQuotaCacheTests.swift */; };
 		A00000000000000000000014 /* AppServerClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000014 /* AppServerClientTests.swift */; };
 		A00000000000000000000015 /* InfrastructureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F00000000000000000000015 /* InfrastructureTests.swift */; };
 /* End PBXBuildFile section */
@@ -43,7 +43,7 @@
 /* Begin PBXFileReference section */
 		F00000000000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		F00000000000000000000002 /* RateLimitModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateLimitModels.swift; sourceTree = "<group>"; };
-		F00000000000000000000003 /* QuotaUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaUsage.swift; sourceTree = "<group>"; };
+		F00000000000000000000003 /* WeeklyQuota.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyQuota.swift; sourceTree = "<group>"; };
 		F00000000000000000000004 /* AppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClient.swift; sourceTree = "<group>"; };
 		F00000000000000000000005 /* CodexLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexLocator.swift; sourceTree = "<group>"; };
 		F00000000000000000000006 /* CodexUsageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexUsageService.swift; sourceTree = "<group>"; };
@@ -59,9 +59,9 @@
 		F00000000000000000000016 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		F00000000000000000000017 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		F00000000000000000000018 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
-		F00000000000000000000011 /* QuotaUsageParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaUsageParserTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000011 /* WeeklyQuotaParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyQuotaParserTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000012 /* RelativeTimeFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelativeTimeFormatterTests.swift; sourceTree = "<group>"; };
-		F00000000000000000000013 /* UsageCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCacheTests.swift; sourceTree = "<group>"; };
+		F00000000000000000000013 /* WeeklyQuotaCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyQuotaCacheTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000014 /* AppServerClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerClientTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000015 /* InfrastructureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfrastructureTests.swift; sourceTree = "<group>"; };
 		F00000000000000000000021 /* codexCycle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = codexCycle.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -114,7 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				F00000000000000000000002 /* RateLimitModels.swift */,
-				F00000000000000000000003 /* QuotaUsage.swift */,
+				F00000000000000000000003 /* WeeklyQuota.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -154,9 +154,9 @@
 		G00000000000000000000007 /* codexCycleTests */ = {
 			isa = PBXGroup;
 			children = (
-				F00000000000000000000011 /* QuotaUsageParserTests.swift */,
+				F00000000000000000000011 /* WeeklyQuotaParserTests.swift */,
 				F00000000000000000000012 /* RelativeTimeFormatterTests.swift */,
-				F00000000000000000000013 /* UsageCacheTests.swift */,
+				F00000000000000000000013 /* WeeklyQuotaCacheTests.swift */,
 				F00000000000000000000014 /* AppServerClientTests.swift */,
 				F00000000000000000000015 /* InfrastructureTests.swift */,
 			);
@@ -276,7 +276,7 @@
 				A00000000000000000000001 /* AppDelegate.swift in Sources */,
 				A00000000000000000000016 /* AppLocalization.swift in Sources */,
 				A00000000000000000000002 /* RateLimitModels.swift in Sources */,
-				A00000000000000000000003 /* QuotaUsage.swift in Sources */,
+				A00000000000000000000003 /* WeeklyQuota.swift in Sources */,
 				A00000000000000000000004 /* AppServerClient.swift in Sources */,
 				A00000000000000000000005 /* CodexLocator.swift in Sources */,
 				A00000000000000000000006 /* CodexUsageService.swift in Sources */,
@@ -294,9 +294,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00000000000000000000011 /* QuotaUsageParserTests.swift in Sources */,
+				A00000000000000000000011 /* WeeklyQuotaParserTests.swift in Sources */,
 				A00000000000000000000012 /* RelativeTimeFormatterTests.swift in Sources */,
-				A00000000000000000000013 /* UsageCacheTests.swift in Sources */,
+				A00000000000000000000013 /* WeeklyQuotaCacheTests.swift in Sources */,
 				A00000000000000000000014 /* AppServerClientTests.swift in Sources */,
 				A00000000000000000000015 /* InfrastructureTests.swift in Sources */,
 			);

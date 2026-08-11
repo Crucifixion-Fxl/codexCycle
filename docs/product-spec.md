@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentage in the main Codex five-hour or weekly quota window. The five-hour view is the first-use default, and the user can switch the preferred view from the menu. It has no Dock icon, main window, notifications, telemetry, updater, or login flow.
+`codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentage in the main Codex weekly quota window. It has no Dock icon, main window, quota selector, notifications, telemetry, updater, or login flow.
 
 English is the first-use interface language. The user can switch between English and Simplified Chinese from the menu without restarting the app, and the app persists that selection.
 
@@ -30,23 +30,15 @@ English is the first-use interface language. The user can switch between English
 - Never read, copy, store, display, or log Codex credentials.
 - If Codex is not logged in, show the unavailable state and instruct the user to log in through the corresponding Codex product separately; `codexCycle` does not open a terminal, desktop app, or browser.
 
-## Quota windows and remaining calculation
+## Weekly quota and remaining calculation
 
 - Read only the main `codex` metering bucket.
-- Treat only `windowDurationMins == 300` as the five-hour window and only `windowDurationMins == 10080` as the weekly window. Either window may appear as the primary or secondary window.
+- Treat only `windowDurationMins == 10080` as the weekly window. It may appear as the primary or secondary window.
 - Never infer a window from its field position, name, or reset time. Ignore credits, plan type, reset credits, other durations, and other model or feature buckets.
-- Parse the five-hour and weekly windows independently. If one is missing, keep the other as fresh, usable data; if both are missing, the usage state is unavailable. Never substitute a different bucket or duration.
+- If the weekly window is missing, the usage state is unavailable. Never substitute a five-hour or other window.
 - Displayed remaining percentage is `floor(100 - usedPercent)`, clamped to `0...100`.
 - The center of the indicator contains the integer only, with no percent sign.
 - A valid percentage remains usable if `resetsAt` is absent, but its reset countdown is `—` and it is not persisted across app restarts.
-
-## Preferred and current view
-
-- On first use, the preferred quota view is five-hour. Persist every explicit user selection and restore it on the next launch.
-- The current view normally equals the preferred view. If the preferred window is unavailable and the other window is available, temporarily show the available window without overwriting the preference.
-- Fallback is symmetric: five-hour may fall back to weekly, and weekly may fall back to five-hour. When the preferred window becomes available again, switch back automatically.
-- An unavailable menu option remains selectable. Selecting it changes the preference even though the current view must continue to fall back until data becomes available.
-- Selecting either quota view updates the indicator immediately using existing data, marks the menu as refreshing, persists the preference, and immediately requests a Runtime refresh.
 
 ## Refresh behavior
 
@@ -54,13 +46,12 @@ English is the first-use interface language. The user can switch between English
 - Poll every five minutes while the Mac is awake; do not wake a sleeping Mac.
 - Refresh immediately when the app-server sends a rate-limit update.
 - Manual refresh is available from the menu and restarts the five-minute interval after success.
-- Selecting a quota view also refreshes immediately. Overlapping selection and other refresh triggers are coalesced.
 - A refresh has a 15-second timeout.
 - Coalesce overlapping launch, timer, wake, manual, and event-triggered refreshes into one request.
 - Ordinary failures wait for the next scheduled or manual attempt. A child-process crash uses the restart backoff above.
 - While refreshing, keep a valid existing reading unchanged. With no reading, show a gray `—`. Disable repeated manual refresh until the request completes.
-- Expire each window exactly at its own reset boundary. If the expired window was the current view, refresh immediately; if it was hidden, only invalidate its reading and do not trigger a Runtime refresh. Switching views or falling back changes which boundary qualifies for immediate refresh.
-- A successful snapshot that omits one window immediately marks only that window unavailable and invalidates its old reading. This partial-availability state is not a refresh failure and does not gray the available window.
+- Expire the weekly reading exactly at its reset boundary and refresh immediately.
+- A successful response that omits the weekly window immediately marks it unavailable and invalidates its old reading. This is not a transport failure and must not preserve stale data.
 
 ## Indicator
 
@@ -71,18 +62,16 @@ English is the first-use interface language. The user can switch between English
 - On macOS 26 and later, use native Liquid Glass. On macOS 13–15, approximate it with translucent material and a highlight stroke.
 - Respect Reduce Transparency and Increase Contrast by falling back to a high-contrast solid face.
 - A stale reading keeps its number but turns the ring gray. With no successful reading, show a gray `—`.
-- The indicator always represents the current view and does not add a `5h`, weekly, or other window badge; the menu identifies the window.
+- The indicator always represents the weekly quota and does not add a weekly badge; the menu identifies the reading.
 - Do not add custom VoiceOver or other accessibility wording.
 - The static Finder app icon uses the same glass face and multicolor ring with `100` in the center.
 
 ## Menu
 
-The app has no main window. Clicking the indicator opens the detail menu in the persisted interface language. On first use, the English menu appears. When both windows are available and five-hour is preferred:
+The app has no main window. Clicking the indicator opens the detail menu in the persisted interface language. On first use, the English menu appears:
 
 ```text
-Display Quota
-✓ 5-hour remaining   67%
-  Weekly remaining  42%
+Weekly remaining    42%
 Resets in            3 hours 18 minutes
 Last updated         3 minutes ago
 ────────────
@@ -95,37 +84,33 @@ Refresh Now
 Quit codexCycle
 ```
 
-During fallback, the checkmark still identifies the persisted preference and a separate row identifies the effective current view:
+When the weekly window is unavailable, the menu retains the same shape:
 
 ```text
-Display Quota
-✓ 5-hour remaining   —
-  Weekly remaining  42%
-Current view         Weekly remaining (5-hour data unavailable)
-Resets in            2 days 3 hours
-Last updated         3 minutes ago
+Weekly remaining    —
+Resets in           —
+Last updated        —
+Reason              Weekly quota unavailable
 ```
 
-- The five-hour and weekly rows are clickable even when their data is unavailable. Other information rows are disabled; action rows are clickable.
-- The checkmark identifies the preferred view, not necessarily the current view. Show the localized current-view explanation only while fallback makes the two views differ.
-- Both menu readings include `%`; an unavailable reading is `—`. The center indicator omits `%`.
-- The reset countdown and status colors always correspond to the current view and change immediately when the current view changes.
+- The weekly row is read-only, includes `%` when available, and shows `—` otherwise. The center indicator omits `%`.
+- The reset countdown and status colors always correspond to the weekly reading.
 - The reset countdown uses at most two units and no seconds: `2 days 3 hours`, `4 hours 18 minutes`, or `less than 1 minute` in English, with equivalent Simplified Chinese text.
 - The menu recalculates relative times at least once per minute while the app runs.
-- A missing non-current window is shown only on its own row. A missing preferred window is also explained by the fallback row; neither case is a global error.
-- Errors add one short localized reason when both windows are unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, both supported limits missing, network failure, or Codex service unavailable.
+- Errors add one short localized reason when the weekly window is unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, weekly quota unavailable, network failure, or Codex service unavailable.
 - The Language rows remain available in both localizations. Switching language updates the open menu immediately and persists the choice; first use defaults to English.
 - If login launch is disabled, show that state and provide a localized action that opens Login Items Settings.
 - The localized `Quit codexCycle` action stops the current process but leaves launch-at-login registered.
 
 ## Cached state and failure behavior
 
-- Store only the preferred view, interface language, the last successful reading for each supported window, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. Each reading contains its percentage, reset timestamp, and fetch timestamp.
-- Persist a window reading only when it has a reset timestamp.
-- On launch, restore each non-expired reading as gray and stale until a live refresh succeeds, then derive the current view from the restored preference and available readings.
-- Expire and discard each cached window independently at its own reset timestamp. If the current window expires while the other remains usable, apply the normal fallback rule.
-- A total refresh failure retains each non-expired reading as gray stale data and shows the last successful update plus a short reason.
-- A successful partial snapshot clears the omitted window's cached reading and leaves the returned window fresh; it does not reuse the omitted window as stale data.
+- Store only the interface language, last successful weekly reading, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. The reading contains its percentage, reset timestamp, and fetch timestamp.
+- Persist the weekly reading only when it has a reset timestamp.
+- On launch, restore a non-expired reading as gray and stale until a live refresh succeeds.
+- Expire and discard the cached reading at its reset timestamp, then refresh immediately.
+- A total refresh failure retains a non-expired reading as gray stale data and shows the last successful update plus a short reason.
+- A successful response without the weekly window clears the cached reading; it does not reuse it as stale data.
+- During upgrade, retain a valid `usage.weekly.*` cache and remove five-hour, legacy-weekly, and preferred-view keys.
 - Detailed errors use macOS unified logging. Logs exclude tokens, account information, credentials, and full protocol payloads.
 
 ## Launch, privacy, and lifecycle
@@ -149,9 +134,9 @@ Last updated         3 minutes ago
 
 ## Verification
 
-- Unit tests cover exact five-hour and weekly window selection in either field, remaining calculation, preferred/current view derivation, symmetric fallback, selection persistence, English-default and Simplified-Chinese presentation, gradient bands, countdown formatting, independent cache expiration, partial availability, and error classification.
+- Unit tests cover exact weekly-window selection in either field, rejection of five-hour-only responses, remaining calculation, English-default and Simplified-Chinese presentation, gradient bands, countdown formatting, cache expiration and migration, and error classification.
 - A fake JSONL app-server process covers initialization, timeout, process exit, sparse-update handling, and full-snapshot refresh without a real account.
-- Real acceptance verifies the default English interface, live switching to persisted Simplified Chinese, default five-hour view, selectable and persisted weekly view, immediate refresh after selection, fallback explanation, automatic recovery to the preferred view, current-view reset refresh, indicator, menu, manual and periodic refresh, wake refresh, login launch, real quota percentages, independent cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
+- Real acceptance verifies the default English interface, live switching to persisted Simplified Chinese, weekly-only indicator and menu, reset refresh, manual and periodic refresh, wake refresh, login launch, real weekly quota percentage, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
 - Reading limits must not start model work or consume model usage.
 - Idle operation must not continuously consume CPU.
 

@@ -51,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menuController = StatusMenuController(language: preferences.appLanguage)
         let coordinator = RefreshCoordinator(
             service: service,
-            cache: UserDefaultsUsageCache(),
+            cache: UserDefaultsWeeklyQuotaCache(),
             menuController: menuController,
             loginItemManager: loginItemManager,
             preferences: preferences
@@ -80,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         service.fetch { [weak self] result in
             switch result {
-            case .success(let snapshot):
+            case .success(let reading):
                 print(
                     "\(localization.text("diagnostic.runtime")): "
                         + "\(preferences.selectedCodexPath ?? "—")"
@@ -90,20 +90,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         + "\(preferences.selectedCodexVersion ?? "—")"
                 )
                 print(
-                    "\(localization.text("diagnostic.five_hour_remaining")): "
-                        + "\(snapshot.fiveHour.map { "\($0.remainingPercent)%" } ?? "—")"
-                )
-                print(
-                    "\(localization.text("diagnostic.five_hour_reset")): "
-                        + "\(snapshot.fiveHour?.resetsAt?.timeIntervalSince1970.description ?? "—")"
-                )
-                print(
                     "\(localization.text("diagnostic.weekly_remaining")): "
-                        + "\(snapshot.weekly.map { "\($0.remainingPercent)%" } ?? "—")"
+                        + "\(reading.remainingPercent)%"
                 )
                 print(
                     "\(localization.text("diagnostic.weekly_reset")): "
-                        + "\(snapshot.weekly?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                        + "\(reading.resetsAt?.timeIntervalSince1970.description ?? "—")"
                 )
             case .failure(let error):
                 print(

@@ -193,8 +193,8 @@ final class InfrastructureTests: XCTestCase {
             "Codex Runtime 不兼容"
         )
         XCTAssertEqual(
-            DisplayErrorReason.classify(QuotaUsageError.noSupportedWindows),
-            .supportedLimitsMissing
+            DisplayErrorReason.classify(WeeklyQuotaError.weeklyWindowUnavailable),
+            .weeklyQuotaUnavailable
         )
         XCTAssertEqual(
             DisplayErrorReason.classify(
@@ -320,21 +320,17 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
-    func testMenuDistinguishesPreferredAndCurrentViewsDuringFallback() {
+    func testMenuShowsOnlyWeeklyQuotaInBothLanguages() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let controller = StatusMenuController()
         controller.update(
             state: .fresh(
-                QuotaUsageSnapshot(
-                    fiveHour: nil,
-                    weekly: QuotaUsageReading(
-                        remainingPercent: 42,
-                        resetsAt: now.addingTimeInterval(86_400),
-                        fetchedAt: now
-                    )
+                WeeklyQuotaReading(
+                    remainingPercent: 42,
+                    resetsAt: now.addingTimeInterval(86_400),
+                    fetchedAt: now
                 )
             ),
-            preferredWindow: .fiveHour,
             refreshing: false,
             loginLaunchState: .enabled,
             now: now
@@ -344,29 +340,29 @@ final class InfrastructureTests: XCTestCase {
 
         XCTAssertEqual(presentation.indicatorRemainingPercent, 42)
         XCTAssertEqual(presentation.language, .english)
-        XCTAssertEqual(presentation.quotaHeaderTitle, "Display Quota")
-        XCTAssertTrue(presentation.fiveHourIsPreferred)
-        XCTAssertFalse(presentation.weeklyIsPreferred)
-        XCTAssertEqual(presentation.fiveHourTitle, "5-hour remaining      —")
         XCTAssertEqual(presentation.weeklyTitle, "Weekly remaining      42%")
-        XCTAssertEqual(
-            presentation.currentViewTitle,
-            "Current view     Weekly remaining (5-hour data unavailable)"
-        )
         XCTAssertEqual(presentation.resetTitle, "Resets in        1 day")
 
         controller.setLanguage(.simplifiedChinese, now: now)
-        let chinesePresentation = controller.presentationSnapshot
 
-        XCTAssertEqual(chinesePresentation.language, .simplifiedChinese)
-        XCTAssertEqual(chinesePresentation.quotaHeaderTitle, "显示限额")
-        XCTAssertEqual(chinesePresentation.fiveHourTitle, "5 小时余量      —")
-        XCTAssertEqual(chinesePresentation.weeklyTitle, "周余量      42%")
-        XCTAssertEqual(
-            chinesePresentation.currentViewTitle,
-            "当前显示      周余量（5 小时数据不可用）"
+        XCTAssertEqual(controller.presentationSnapshot.weeklyTitle, "周余量      42%")
+        XCTAssertEqual(controller.presentationSnapshot.resetTitle, "重置倒计时    1 天")
+    }
+
+    @MainActor
+    func testMenuKeepsWeeklyRowWhenQuotaIsUnavailable() {
+        let controller = StatusMenuController()
+        controller.update(
+            state: .unavailable(.weeklyQuotaUnavailable),
+            refreshing: false,
+            loginLaunchState: .enabled
         )
-        XCTAssertEqual(chinesePresentation.resetTitle, "重置倒计时    1 天")
+
+        XCTAssertEqual(controller.presentationSnapshot.weeklyTitle, "Weekly remaining      —")
+        XCTAssertEqual(
+            controller.presentationSnapshot.errorTitle,
+            "Reason           Weekly quota unavailable"
+        )
     }
 
     private func assertDesktopRuntimeIsRejected(

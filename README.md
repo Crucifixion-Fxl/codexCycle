@@ -2,10 +2,9 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-`codexCycle` is a lightweight macOS menu-bar app that keeps your Codex quota
-visible without opening another window. It shows either the five-hour or weekly
-remaining percentage, refreshes automatically, and uses your existing local
-Codex authentication.
+`codexCycle` is a lightweight macOS menu-bar app that keeps your weekly Codex
+quota visible without opening another window. It refreshes automatically and
+uses your existing local Codex authentication.
 
 <p align="center">
   <img src="docs/images/codexcycle-status-item.png" width="100" alt="codexCycle menu-bar indicator showing 85 percent remaining">
@@ -13,27 +12,25 @@ Codex authentication.
 
 ## What it shows
 
-- The number in the menu bar is the remaining percentage for the current quota
-  view. The center omits the `%` sign to stay readable at menu-bar size.
+- The number in the menu bar is the weekly remaining percentage. The center
+  omits the `%` sign to stay readable at menu-bar size.
 - The remaining arc follows a fixed red → yellow → green scale: red at `0`,
   yellow at `20`, and green from `50` through `100`.
-- Clicking the indicator opens both quota readings, reset countdown, last update
+- Clicking the indicator opens the weekly reading, reset countdown, last update
   time, manual refresh, and language controls.
 - English is the first-launch default. You can switch to Simplified Chinese
   immediately; the app remembers your choice.
 
 ## Display logic
 
-- The five-hour quota is the first-use preferred view. Choosing the weekly view
-  updates the indicator immediately and persists across launches.
-- If the preferred quota is unavailable but the other quota exists, the app
-  temporarily displays the available reading without changing your preference.
+- Only the main `codex` bucket's exact seven-day window is shown. Other windows
+  are ignored rather than substituted.
 - Remaining quota is `floor(100 - usedPercent)`, clamped to `0...100`.
 - A failed refresh keeps a valid cached number but turns the ring gray. A reading
   expires at its reset boundary; no valid reading is shown as `—`.
 - Reset time is relative, uses at most two units, and never displays seconds.
 - Data refreshes on launch, every five minutes, after wake, after a quota update,
-  when switching views, and on manual refresh.
+  at the weekly reset boundary, and on manual refresh.
 
 ## Requirements
 
