@@ -72,11 +72,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let service = CodexUsageService(locator: locator, preferences: preferences)
         let localization = AppLocalization(language: preferences.appLanguage)
         diagnosticService = service
-        let loginState = LoginItemManager(preferences: preferences).state
-        let loginStateText = localization.text(
-            loginState == .enabled ? "diagnostic.enabled" : "diagnostic.disabled"
-        )
-        print("\(localization.text("diagnostic.login_launch")): \(loginStateText)")
 
         service.fetch { [weak self] result in
             switch result {

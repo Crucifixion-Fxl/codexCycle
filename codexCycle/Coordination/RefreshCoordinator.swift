@@ -122,13 +122,8 @@ final class RefreshCoordinator {
                 if error is WeeklyQuotaError {
                     self.cache.clear()
                     self.state = .unavailable(reason)
-                } else if let reading = self.state.reading,
-                          reading.isValid(at: Date()) {
-                    self.state = .stale(reading, reason)
-                    self.cache.save(reading)
                 } else {
-                    self.cache.clear()
-                    self.state = .unavailable(reason)
+                    self.retainValidReadingOrBecomeUnavailable(reason)
                 }
 
                 if case .processRecovery = trigger {
@@ -197,6 +192,13 @@ final class RefreshCoordinator {
 
     private func handleUnexpectedProcessTermination(_ error: Error) {
         let reason = DisplayErrorReason.classify(error)
+        retainValidReadingOrBecomeUnavailable(reason)
+        scheduleExpirationBoundaryTimer()
+        updatePresentation()
+        scheduleReconnectAttempt()
+    }
+
+    private func retainValidReadingOrBecomeUnavailable(_ reason: DisplayErrorReason) {
         if let reading = state.reading, reading.isValid(at: Date()) {
             state = .stale(reading, reason)
             cache.save(reading)
@@ -204,9 +206,6 @@ final class RefreshCoordinator {
             cache.clear()
             state = .unavailable(reason)
         }
-        scheduleExpirationBoundaryTimer()
-        updatePresentation()
-        scheduleReconnectAttempt()
     }
 
     private func scheduleReconnectAttempt() {

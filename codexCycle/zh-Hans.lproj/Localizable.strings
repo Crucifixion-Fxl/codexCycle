@@ -29,9 +29,6 @@
 "error.network_failure" = "网络连接失败";
 "error.service_unavailable" = "Codex 服务暂时不可用";
 
-"diagnostic.login_launch" = "登录启动";
-"diagnostic.enabled" = "已启用";
-"diagnostic.disabled" = "已禁用";
 "diagnostic.runtime" = "Codex Runtime";
 "diagnostic.runtime_version" = "Codex 版本";
 "diagnostic.weekly_remaining" = "周余量";

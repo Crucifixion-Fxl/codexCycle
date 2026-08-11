@@ -29,9 +29,6 @@
 "error.network_failure" = "Network connection failed";
 "error.service_unavailable" = "Codex service temporarily unavailable";
 
-"diagnostic.login_launch" = "Launch at Login";
-"diagnostic.enabled" = "enabled";
-"diagnostic.disabled" = "disabled";
 "diagnostic.runtime" = "Codex Runtime";
 "diagnostic.runtime_version" = "Codex version";
 "diagnostic.weekly_remaining" = "Weekly remaining";

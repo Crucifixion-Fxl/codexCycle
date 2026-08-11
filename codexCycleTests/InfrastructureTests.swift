@@ -3,6 +3,13 @@ import XCTest
 @testable import codexCycle
 
 final class InfrastructureTests: XCTestCase {
+    func testStatusIndicatorGradientUsesRedYellowGreenAnchors() {
+        XCTAssertEqual(UsageGradient.color(at: 0), UsageGradient.red)
+        XCTAssertEqual(UsageGradient.color(at: 20), UsageGradient.yellow)
+        XCTAssertEqual(UsageGradient.color(at: 50), UsageGradient.green)
+        XCTAssertEqual(UsageGradient.color(at: 100), UsageGradient.green)
+    }
+
     func testDiscoversCurrentDesktopRuntimeWithoutIndependentCLI() throws {
         let fixture = try RuntimeDiscoveryFixture()
         defer { fixture.remove() }

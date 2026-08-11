@@ -43,8 +43,7 @@ final class UserDefaultsWeeklyQuotaCache: WeeklyQuotaCaching {
         if let reading {
             saveCanonical(reading)
         }
-        clear(keys: Self.legacyWeeklyKeys)
-        Self.obsoleteKeys.forEach(defaults.removeObject(forKey:))
+        clearObsoleteState()
         return reading
     }
 
@@ -56,6 +55,10 @@ final class UserDefaultsWeeklyQuotaCache: WeeklyQuotaCaching {
 
     func clear() {
         clear(keys: Self.weeklyKeys)
+        clearObsoleteState()
+    }
+
+    private func clearObsoleteState() {
         clear(keys: Self.legacyWeeklyKeys)
         Self.obsoleteKeys.forEach(defaults.removeObject(forKey:))
     }
