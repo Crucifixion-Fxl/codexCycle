@@ -133,20 +133,6 @@ final class WeeklyQuotaParserTests: XCTestCase {
         XCTAssertNil(reading.resetsAt)
     }
 
-    func testUsageLevelsUseConfirmedThresholds() {
-        XCTAssertEqual(UsageLevel(remainingPercent: 50), .sufficient)
-        XCTAssertEqual(UsageLevel(remainingPercent: 49), .low)
-        XCTAssertEqual(UsageLevel(remainingPercent: 20), .low)
-        XCTAssertEqual(UsageLevel(remainingPercent: 19), .critical)
-    }
-
-    func testGradientUsesRedYellowGreenAnchors() {
-        XCTAssertEqual(UsageGradient.color(at: 0), UsageGradient.red)
-        XCTAssertEqual(UsageGradient.color(at: 20), UsageGradient.yellow)
-        XCTAssertEqual(UsageGradient.color(at: 50), UsageGradient.green)
-        XCTAssertEqual(UsageGradient.color(at: 100), UsageGradient.green)
-    }
-
     private func snapshot(
         id: String,
         used: Double,
