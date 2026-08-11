@@ -5,7 +5,7 @@ enum DisplayErrorReason: Equatable {
     case runtimeNotFound
     case incompatibleRuntime
     case notLoggedIn
-    case supportedLimitsMissing
+    case weeklyQuotaUnavailable
     case networkFailure
     case serviceUnavailable
 
@@ -17,8 +17,8 @@ enum DisplayErrorReason: Equatable {
             return "error.incompatible_runtime"
         case .notLoggedIn:
             return "error.not_logged_in"
-        case .supportedLimitsMissing:
-            return "error.supported_limits_missing"
+        case .weeklyQuotaUnavailable:
+            return "error.weekly_quota_unavailable"
         case .networkFailure:
             return "error.network_failure"
         case .serviceUnavailable:
@@ -36,10 +36,10 @@ enum DisplayErrorReason: Equatable {
             }
         }
 
-        if let quotaError = error as? QuotaUsageError {
+        if let quotaError = error as? WeeklyQuotaError {
             switch quotaError {
-            case .noMainCodexBucket, .noSupportedWindows:
-                return .supportedLimitsMissing
+            case .noMainCodexBucket, .weeklyWindowUnavailable:
+                return .weeklyQuotaUnavailable
             }
         }
 
@@ -87,7 +87,7 @@ final class CodexUsageService {
 
     private var client: AppServerClient?
     private var connecting = false
-    private var queuedCompletions: [(Result<QuotaUsageSnapshot, Error>) -> Void] = []
+    private var queuedCompletions: [(Result<WeeklyQuotaReading, Error>) -> Void] = []
 
     var onRateLimitsUpdated: (() -> Void)?
     var onUnexpectedTermination: ((Error) -> Void)?
@@ -100,11 +100,11 @@ final class CodexUsageService {
         self.preferences = preferences
     }
 
-    func fetch(completion: @escaping (Result<QuotaUsageSnapshot, Error>) -> Void) {
+    func fetch(completion: @escaping (Result<WeeklyQuotaReading, Error>) -> Void) {
         dispatchPrecondition(condition: .onQueue(.main))
 
         if let client {
-            readQuotaUsage(from: client, completion: completion)
+            readWeeklyQuota(from: client, completion: completion)
             return
         }
 
@@ -170,8 +170,8 @@ final class CodexUsageService {
                         self.preferences.selectedCodexPath = candidate.executableURL.path
                         self.preferences.selectedCodexVersion = candidate.version.description
                         do {
-                            let snapshot = try QuotaUsageParser.parse(payload)
-                            self.finishConnection(.success(snapshot))
+                            let reading = try WeeklyQuotaParser.parse(payload)
+                            self.finishConnection(.success(reading))
                         } catch {
                             self.finishConnection(.failure(error))
                         }
@@ -195,22 +195,22 @@ final class CodexUsageService {
         }
     }
 
-    private func finishConnection(_ result: Result<QuotaUsageSnapshot, Error>) {
+    private func finishConnection(_ result: Result<WeeklyQuotaReading, Error>) {
         connecting = false
         let completions = queuedCompletions
         queuedCompletions.removeAll()
         completions.forEach { $0(result) }
     }
 
-    private func readQuotaUsage(
+    private func readWeeklyQuota(
         from client: AppServerClient,
-        completion: @escaping (Result<QuotaUsageSnapshot, Error>) -> Void
+        completion: @escaping (Result<WeeklyQuotaReading, Error>) -> Void
     ) {
         client.readRateLimits { result in
             switch result {
             case .success(let payload):
                 do {
-                    completion(.success(try QuotaUsageParser.parse(payload)))
+                    completion(.success(try WeeklyQuotaParser.parse(payload)))
                 } catch {
                     completion(.failure(error))
                 }

@@ -1,16 +1,16 @@
 import AppKit
 
-enum UsageDisplayState: Equatable {
+enum WeeklyQuotaDisplayState: Equatable {
     case unavailable(DisplayErrorReason?)
-    case stale(QuotaUsageSnapshot, DisplayErrorReason?)
-    case fresh(QuotaUsageSnapshot)
+    case stale(WeeklyQuotaReading, DisplayErrorReason?)
+    case fresh(WeeklyQuotaReading)
 
-    var snapshot: QuotaUsageSnapshot? {
+    var reading: WeeklyQuotaReading? {
         switch self {
         case .unavailable:
             return nil
-        case .stale(let snapshot, _), .fresh(let snapshot):
-            return snapshot
+        case .stale(let reading, _), .fresh(let reading):
+            return reading
         }
     }
 
@@ -42,18 +42,10 @@ struct StatusItemLayoutSnapshot {
 struct StatusMenuPresentationSnapshot {
     let indicatorRemainingPercent: Int?
     let language: AppLanguage
-    let quotaHeaderTitle: String
-    let fiveHourTitle: String
     let weeklyTitle: String
-    let fiveHourIsPreferred: Bool
-    let weeklyIsPreferred: Bool
-    let currentViewTitle: String?
     let resetTitle: String
-}
-
-private struct QuotaWindowPresentation {
-    let label: String
-    let shortLabel: String
+    let updatedTitle: String
+    let errorTitle: String?
 }
 
 final class StatusMenuController: NSObject, NSMenuDelegate {
@@ -61,10 +53,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let indicatorView: StatusIndicatorView
     private let menu = NSMenu()
 
-    private let quotaHeaderItem = NSMenuItem()
-    private let fiveHourItem = NSMenuItem()
     private let weeklyItem = NSMenuItem()
-    private let currentViewItem = NSMenuItem()
     private let resetItem = NSMenuItem()
     private let updatedItem = NSMenuItem()
     private let errorItem = NSMenuItem()
@@ -76,15 +65,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let openLoginSettingsItem = NSMenuItem()
     private let quitItem = NSMenuItem()
 
-    private var state: UsageDisplayState = .unavailable(nil)
-    private var preferredWindow: QuotaWindow = .fiveHour
+    private var state: WeeklyQuotaDisplayState = .unavailable(nil)
     private var refreshing = false
     private var loginLaunchState: LoginLaunchState = .enabled
     private var language: AppLanguage
     private var localization: AppLocalization
 
     var onRefresh: (() -> Void)?
-    var onSelectQuotaWindow: ((QuotaWindow) -> Void)?
     var onSelectLanguage: ((AppLanguage) -> Void)?
     var onOpenLoginSettings: (() -> Void)?
 
@@ -100,15 +87,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         StatusMenuPresentationSnapshot(
             indicatorRemainingPercent: indicatorView.remainingPercent,
             language: language,
-            quotaHeaderTitle: quotaHeaderItem.title,
-            fiveHourTitle: fiveHourItem.title,
             weeklyTitle: weeklyItem.title,
-            fiveHourIsPreferred: fiveHourItem.state == .on,
-            weeklyIsPreferred: weeklyItem.state == .on,
-            currentViewTitle: currentViewItem.isHidden
-                ? nil
-                : currentViewItem.title,
-            resetTitle: resetItem.title
+            resetTitle: resetItem.title,
+            updatedTitle: updatedItem.title,
+            errorTitle: errorItem.isHidden ? nil : errorItem.title
         )
     }
 
@@ -132,31 +114,23 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         configureMenu()
         update(
             state: .unavailable(nil),
-            preferredWindow: .fiveHour,
             refreshing: false,
             loginLaunchState: .enabled
         )
     }
 
     func update(
-        state: UsageDisplayState,
-        preferredWindow: QuotaWindow,
+        state: WeeklyQuotaDisplayState,
         refreshing: Bool,
         loginLaunchState: LoginLaunchState,
         now: Date = Date()
     ) {
         self.state = state
-        self.preferredWindow = preferredWindow
         self.refreshing = refreshing
         self.loginLaunchState = loginLaunchState
 
-        let selection = QuotaDisplaySelection(
-            preferredWindow: preferredWindow,
-            snapshot: state.snapshot
-        )
-        indicatorView.remainingPercent = selection.currentReading?.remainingPercent
+        indicatorView.remainingPercent = state.reading?.remainingPercent
         indicatorView.isStale = state.isStale
-
         updateMenuText(now: now)
     }
 
@@ -172,14 +146,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     @objc private func refreshSelected() {
         onRefresh?()
-    }
-
-    @objc private func fiveHourSelected() {
-        onSelectQuotaWindow?(.fiveHour)
-    }
-
-    @objc private func weeklySelected() {
-        onSelectQuotaWindow?(.weekly)
     }
 
     @objc private func englishLanguageSelected() {
@@ -218,20 +184,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
 
-        quotaHeaderItem.isEnabled = false
-        menu.addItem(quotaHeaderItem)
-
-        fiveHourItem.target = self
-        fiveHourItem.action = #selector(fiveHourSelected)
-        fiveHourItem.isEnabled = true
-        menu.addItem(fiveHourItem)
-
-        weeklyItem.target = self
-        weeklyItem.action = #selector(weeklySelected)
-        weeklyItem.isEnabled = true
-        menu.addItem(weeklyItem)
-
-        [currentViewItem, resetItem, updatedItem, errorItem].forEach {
+        [weeklyItem, resetItem, updatedItem, errorItem].forEach {
             $0.isEnabled = false
             menu.addItem($0)
         }
@@ -273,12 +226,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     private func updateMenuText(now: Date) {
-        let snapshot = state.snapshot
-        let selection = QuotaDisplaySelection(
-            preferredWindow: preferredWindow,
-            snapshot: snapshot
-        )
-        quotaHeaderItem.title = localization.text("menu.quota_header")
         languageHeaderItem.title = localization.text("menu.language_header")
         englishLanguageItem.title = localization.text("menu.language_english")
         simplifiedChineseLanguageItem.title = localization.text(
@@ -292,36 +239,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let staleSuffix = state.isStale
             ? localization.text("menu.stale_suffix")
             : ""
-        let fiveHourPresentation = presentation(for: .fiveHour)
-        let weeklyPresentation = presentation(for: .weekly)
-
-        fiveHourItem.title = quotaTitle(
-            label: fiveHourPresentation.label,
-            reading: snapshot?.fiveHour,
+        weeklyItem.title = weeklyQuotaTitle(
+            reading: state.reading,
             staleSuffix: staleSuffix
         )
-        weeklyItem.title = quotaTitle(
-            label: weeklyPresentation.label,
-            reading: snapshot?.weekly,
-            staleSuffix: staleSuffix
-        )
-        fiveHourItem.state = preferredWindow == .fiveHour ? .on : .off
-        weeklyItem.state = preferredWindow == .weekly ? .on : .off
 
-        if selection.isFallback, let currentWindow = selection.currentWindow {
-            let current = presentation(for: currentWindow)
-            let preferred = presentation(for: preferredWindow)
-            currentViewItem.title = localization.format(
-                "menu.current_view",
-                current.label,
-                preferred.shortLabel
-            )
-            currentViewItem.isHidden = false
-        } else {
-            currentViewItem.isHidden = true
-        }
-
-        if let reading = selection.currentReading {
+        if let reading = state.reading {
             resetItem.title = localization.format(
                 "menu.reset_countdown",
                 RelativeTimeText.countdown(
@@ -368,31 +291,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         openLoginSettingsItem.isEnabled = loginDisabled
     }
 
-    private func quotaTitle(
-        label: String,
-        reading: QuotaUsageReading?,
+    private func weeklyQuotaTitle(
+        reading: WeeklyQuotaReading?,
         staleSuffix: String
     ) -> String {
+        let label = localization.text("menu.weekly_remaining")
         guard let reading else {
             return "\(label)      —"
         }
         return "\(label)      \(reading.remainingPercent)%\(staleSuffix)"
-    }
-
-    private func presentation(
-        for window: QuotaWindow
-    ) -> QuotaWindowPresentation {
-        switch window {
-        case .fiveHour:
-            return QuotaWindowPresentation(
-                label: localization.text("menu.five_hour_remaining"),
-                shortLabel: localization.text("menu.five_hour_short")
-            )
-        case .weekly:
-            return QuotaWindowPresentation(
-                label: localization.text("menu.weekly_remaining"),
-                shortLabel: localization.text("menu.weekly_short")
-            )
-        }
     }
 }

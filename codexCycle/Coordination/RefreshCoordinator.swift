@@ -7,7 +7,6 @@ enum RefreshTrigger {
     case timer
     case wake
     case manual
-    case viewSelection
     case serverEvent
     case resetBoundary
     case processRecovery
@@ -15,13 +14,13 @@ enum RefreshTrigger {
 
 final class RefreshCoordinator {
     private let service: CodexUsageService
-    private let cache: UsageCaching
+    private let cache: WeeklyQuotaCaching
     private let menuController: StatusMenuController
     private let loginItemManager: LoginItemManager
     private let preferences: AppPreferences
     private let logger = Logger(subsystem: "com.fxl.codexCycle", category: "refresh")
 
-    private var state: UsageDisplayState = .unavailable(nil)
+    private var state: WeeklyQuotaDisplayState = .unavailable(nil)
     private var refreshing = false
     private var pollTimer: Timer?
     private var relativeTimer: Timer?
@@ -33,7 +32,7 @@ final class RefreshCoordinator {
 
     init(
         service: CodexUsageService,
-        cache: UsageCaching,
+        cache: WeeklyQuotaCaching,
         menuController: StatusMenuController,
         loginItemManager: LoginItemManager,
         preferences: AppPreferences
@@ -64,9 +63,6 @@ final class RefreshCoordinator {
 
         menuController.onRefresh = { [weak self] in
             self?.requestRefresh(trigger: .manual)
-        }
-        menuController.onSelectQuotaWindow = { [weak self] window in
-            self?.selectQuotaWindow(window)
         }
         menuController.onSelectLanguage = { [weak self] language in
             self?.selectLanguage(language)
@@ -123,13 +119,13 @@ final class RefreshCoordinator {
                 self.schedulePollTimer()
             case .failure(let error):
                 let reason = DisplayErrorReason.classify(error)
-                if error is QuotaUsageError {
+                if error is WeeklyQuotaError {
                     self.cache.clear()
                     self.state = .unavailable(reason)
-                } else if let snapshot = self.state.snapshot?
-                    .removingExpiredReadings(at: Date()) {
-                    self.state = .stale(snapshot, reason)
-                    self.cache.save(snapshot)
+                } else if let reading = self.state.reading,
+                          reading.isValid(at: Date()) {
+                    self.state = .stale(reading, reason)
+                    self.cache.save(reading)
                 } else {
                     self.cache.clear()
                     self.state = .unavailable(reason)
@@ -170,7 +166,7 @@ final class RefreshCoordinator {
         expirationBoundaryTimer?.invalidate()
         expirationBoundaryTimer = nil
 
-        guard let resetsAt = state.snapshot?.earliestResetAt else {
+        guard let resetsAt = state.reading?.resetsAt else {
             return
         }
 
@@ -189,47 +185,21 @@ final class RefreshCoordinator {
 
     private func invalidateExpiredReadingAndRefreshIfNeeded() {
         let now = Date()
-        let selectionBeforeExpiration = QuotaDisplaySelection(
-            preferredWindow: preferences.preferredQuotaWindow,
-            snapshot: state.snapshot
-        )
-        let currentWindowExpired = selectionBeforeExpiration.currentReading?
-            .resetsAt
-            .map { $0 <= now }
-            ?? false
+        guard let reading = state.reading, !reading.isValid(at: now) else { return }
 
-        guard let existingSnapshot = state.snapshot else { return }
-        let filteredSnapshot = existingSnapshot.removingExpiredReadings(at: now)
-        guard filteredSnapshot != existingSnapshot else { return }
-
-        if let filteredSnapshot {
-            cache.save(filteredSnapshot)
-            switch state {
-            case .fresh:
-                state = .fresh(filteredSnapshot)
-            case .stale(_, let reason):
-                state = .stale(filteredSnapshot, reason)
-            case .unavailable:
-                break
-            }
-        } else {
-            cache.clear()
-            state = .unavailable(nil)
-        }
+        cache.clear()
+        state = .unavailable(nil)
 
         scheduleExpirationBoundaryTimer()
         updatePresentation()
-        if currentWindowExpired {
-            requestRefresh(trigger: .resetBoundary)
-        }
+        requestRefresh(trigger: .resetBoundary)
     }
 
     private func handleUnexpectedProcessTermination(_ error: Error) {
         let reason = DisplayErrorReason.classify(error)
-        if let snapshot = state.snapshot?
-            .removingExpiredReadings(at: Date()) {
-            state = .stale(snapshot, reason)
-            cache.save(snapshot)
+        if let reading = state.reading, reading.isValid(at: Date()) {
+            state = .stale(reading, reason)
+            cache.save(reading)
         } else {
             cache.clear()
             state = .unavailable(reason)
@@ -260,17 +230,9 @@ final class RefreshCoordinator {
     private func updatePresentation() {
         menuController.update(
             state: state,
-            preferredWindow: preferences.preferredQuotaWindow,
             refreshing: refreshing,
             loginLaunchState: loginItemManager.state
         )
-    }
-
-    private func selectQuotaWindow(_ window: QuotaWindow) {
-        preferences.preferredQuotaWindow = window
-        scheduleExpirationBoundaryTimer()
-        updatePresentation()
-        requestRefresh(trigger: .viewSelection)
     }
 
     private func selectLanguage(_ language: AppLanguage) {
