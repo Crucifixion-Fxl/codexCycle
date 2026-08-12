@@ -4,7 +4,7 @@ enum RelativeTimeText {
     static func countdown(
         to date: Date?,
         now: Date = Date(),
-        localization: AppLocalization = AppLocalization(language: .english)
+        localization: AppLocalization = AppLocalization()
     ) -> String {
         guard let date else {
             return "—"
@@ -60,7 +60,7 @@ enum RelativeTimeText {
     static func since(
         _ date: Date,
         now: Date = Date(),
-        localization: AppLocalization = AppLocalization(language: .english)
+        localization: AppLocalization = AppLocalization()
     ) -> String {
         let totalSeconds = max(0, Int(now.timeIntervalSince(date)))
         if totalSeconds < 60 {

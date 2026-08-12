@@ -41,7 +41,6 @@ struct StatusItemLayoutSnapshot {
 
 struct StatusMenuPresentationSnapshot {
     let indicatorRemainingPercent: Int?
-    let language: AppLanguage
     let weeklyTitle: String
     let resetTitle: String
     let updatedTitle: String
@@ -57,9 +56,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let resetItem = NSMenuItem()
     private let updatedItem = NSMenuItem()
     private let errorItem = NSMenuItem()
-    private let languageHeaderItem = NSMenuItem()
-    private let englishLanguageItem = NSMenuItem()
-    private let simplifiedChineseLanguageItem = NSMenuItem()
     private let refreshItem = NSMenuItem()
     private let loginDisabledItem = NSMenuItem()
     private let openLoginSettingsItem = NSMenuItem()
@@ -68,11 +64,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private var state: WeeklyQuotaDisplayState = .unavailable(nil)
     private var refreshing = false
     private var loginLaunchState: LoginLaunchState = .enabled
-    private var language: AppLanguage
-    private var localization: AppLocalization
+    private let localization: AppLocalization
 
     var onRefresh: (() -> Void)?
-    var onSelectLanguage: ((AppLanguage) -> Void)?
     var onOpenLoginSettings: (() -> Void)?
 
     var layoutSnapshot: StatusItemLayoutSnapshot {
@@ -86,7 +80,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var presentationSnapshot: StatusMenuPresentationSnapshot {
         StatusMenuPresentationSnapshot(
             indicatorRemainingPercent: indicatorView.remainingPercent,
-            language: language,
             weeklyTitle: weeklyItem.title,
             resetTitle: resetItem.title,
             updatedTitle: updatedItem.title,
@@ -94,9 +87,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         )
     }
 
-    init(language: AppLanguage = .english) {
-        self.language = language
-        localization = AppLocalization(language: language)
+    init(localization: AppLocalization = AppLocalization()) {
+        self.localization = localization
         statusItem = NSStatusBar.system.statusItem(
             withLength: StatusIndicatorMetrics.statusItemWidth
         )
@@ -138,22 +130,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         updateMenuText(now: Date())
     }
 
-    func setLanguage(_ language: AppLanguage, now: Date = Date()) {
-        self.language = language
-        localization = AppLocalization(language: language)
-        updateMenuText(now: now)
-    }
-
     @objc private func refreshSelected() {
         onRefresh?()
-    }
-
-    @objc private func englishLanguageSelected() {
-        onSelectLanguage?(.english)
-    }
-
-    @objc private func simplifiedChineseLanguageSelected() {
-        onSelectLanguage?(.simplifiedChinese)
     }
 
     @objc private func openLoginSettingsSelected() {
@@ -191,19 +169,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        languageHeaderItem.isEnabled = false
-        menu.addItem(languageHeaderItem)
-
-        englishLanguageItem.target = self
-        englishLanguageItem.action = #selector(englishLanguageSelected)
-        menu.addItem(englishLanguageItem)
-
-        simplifiedChineseLanguageItem.target = self
-        simplifiedChineseLanguageItem.action = #selector(simplifiedChineseLanguageSelected)
-        menu.addItem(simplifiedChineseLanguageItem)
-
-        menu.addItem(.separator())
-
         refreshItem.target = self
         refreshItem.action = #selector(refreshSelected)
         menu.addItem(refreshItem)
@@ -226,16 +191,6 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     private func updateMenuText(now: Date) {
-        languageHeaderItem.title = localization.text("menu.language_header")
-        englishLanguageItem.title = localization.text("menu.language_english")
-        simplifiedChineseLanguageItem.title = localization.text(
-            "menu.language_simplified_chinese"
-        )
-        englishLanguageItem.state = language == .english ? .on : .off
-        simplifiedChineseLanguageItem.state = language == .simplifiedChinese
-            ? .on
-            : .off
-
         let staleSuffix = state.isStale
             ? localization.text("menu.stale_suffix")
             : ""

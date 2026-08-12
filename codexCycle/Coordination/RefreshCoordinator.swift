@@ -17,7 +17,6 @@ final class RefreshCoordinator {
     private let cache: WeeklyQuotaCaching
     private let menuController: StatusMenuController
     private let loginItemManager: LoginItemManager
-    private let preferences: AppPreferences
     private let logger = Logger(subsystem: "com.fxl.codexCycle", category: "refresh")
 
     private var state: WeeklyQuotaDisplayState = .unavailable(nil)
@@ -34,14 +33,12 @@ final class RefreshCoordinator {
         service: CodexUsageService,
         cache: WeeklyQuotaCaching,
         menuController: StatusMenuController,
-        loginItemManager: LoginItemManager,
-        preferences: AppPreferences
+        loginItemManager: LoginItemManager
     ) {
         self.service = service
         self.cache = cache
         self.menuController = menuController
         self.loginItemManager = loginItemManager
-        self.preferences = preferences
     }
 
     func start() {
@@ -63,9 +60,6 @@ final class RefreshCoordinator {
 
         menuController.onRefresh = { [weak self] in
             self?.requestRefresh(trigger: .manual)
-        }
-        menuController.onSelectLanguage = { [weak self] language in
-            self?.selectLanguage(language)
         }
         menuController.onOpenLoginSettings = { [weak self] in
             self?.loginItemManager.openSystemSettings()
@@ -234,9 +228,4 @@ final class RefreshCoordinator {
         )
     }
 
-    private func selectLanguage(_ language: AppLanguage) {
-        preferences.appLanguage = language
-        menuController.setLanguage(language)
-        updatePresentation()
-    }
 }
