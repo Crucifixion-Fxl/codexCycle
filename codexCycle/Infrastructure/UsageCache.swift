@@ -99,7 +99,7 @@ final class AppPreferences {
     private enum Key {
         static let codexPath = "codex.path"
         static let codexVersion = "codex.version"
-        static let appLanguage = "display.language"
+        static let obsoleteAppLanguage = "display.language"
         static let attemptedLoginRegistration = "launchAtLogin.registrationAttempted"
     }
 
@@ -107,6 +107,7 @@ final class AppPreferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        defaults.removeObject(forKey: Key.obsoleteAppLanguage)
     }
 
     var selectedCodexPath: String? {
@@ -117,17 +118,6 @@ final class AppPreferences {
     var selectedCodexVersion: String? {
         get { defaults.string(forKey: Key.codexVersion) }
         set { defaults.set(newValue, forKey: Key.codexVersion) }
-    }
-
-    var appLanguage: AppLanguage {
-        get {
-            defaults.string(forKey: Key.appLanguage)
-                .flatMap(AppLanguage.init(rawValue:))
-                ?? .english
-        }
-        set {
-            defaults.set(newValue.rawValue, forKey: Key.appLanguage)
-        }
     }
 
     var attemptedLoginRegistration: Bool {

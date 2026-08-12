@@ -4,7 +4,7 @@
 
 `codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentage in the main Codex weekly quota window. It has no Dock icon, main window, quota selector, notifications, telemetry, updater, or login flow.
 
-English is the first-use interface language. The user can switch between English and Simplified Chinese from the menu without restarting the app, and the app persists that selection.
+The interface follows the language selected by macOS. English and Simplified Chinese are supported, with English as the fallback for other system languages. The app has no independent language setting.
 
 ## Supported environment
 
@@ -69,16 +69,12 @@ English is the first-use interface language. The user can switch between English
 
 ## Menu
 
-The app has no main window. Clicking the indicator opens the detail menu in the persisted interface language. On first use, the English menu appears:
+The app has no main window. Clicking the indicator opens the detail menu in the interface language selected by macOS. In English, the menu appears:
 
 ```text
 Weekly remaining    42%
 Resets in            3 hours 18 minutes
 Last updated         3 minutes ago
-────────────
-Language
-✓ English
-  简体中文
 ────────────
 Refresh Now
 ────────────
@@ -99,13 +95,14 @@ Reason              Weekly quota unavailable
 - The reset countdown uses at most two units and no seconds: `2 days 3 hours`, `4 hours 18 minutes`, or `less than 1 minute` in English, with equivalent Simplified Chinese text.
 - The menu recalculates relative times at least once per minute while the app runs.
 - Errors add one short localized reason when the weekly window is unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, weekly quota unavailable, network failure, or Codex service unavailable.
-- The Language rows remain available in both localizations. Switching language updates the open menu immediately and persists the choice; first use defaults to English.
+- The menu and read-only diagnostics use the localization selected by macOS. The app does not override that choice or store a language preference.
 - If login launch is disabled, show that state and provide a localized action that opens Login Items Settings.
 - The localized `Quit codexCycle` action stops the current process but leaves launch-at-login registered.
 
 ## Cached state and failure behavior
 
-- Store only the interface language, last successful weekly reading, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. The reading contains its percentage, reset timestamp, and fetch timestamp.
+- Store only the last successful weekly reading, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. The reading contains its percentage, reset timestamp, and fetch timestamp.
+- Remove the obsolete `display.language` preference during upgrade so an earlier in-app choice cannot override the system-selected localization.
 - Persist the weekly reading only when it has a reset timestamp.
 - On launch, restore a non-expired reading as gray and stale until a live refresh succeeds.
 - Expire and discard the cached reading at its reset timestamp, then refresh immediately.
@@ -135,9 +132,9 @@ Reason              Weekly quota unavailable
 
 ## Verification
 
-- Unit tests cover exact weekly-window selection in either field, rejection of five-hour-only responses, remaining calculation, English-default and Simplified-Chinese presentation, gradient bands, countdown formatting, cache expiration and migration, and error classification.
+- Unit tests cover exact weekly-window selection in either field, rejection of five-hour-only responses, remaining calculation, system-selected localization with English and Simplified-Chinese resources, gradient bands, countdown formatting, cache expiration and migration, and error classification.
 - A fake JSONL app-server process covers initialization, timeout, process exit, sparse-update handling, and full-snapshot refresh without a real account.
-- Real acceptance verifies the default English interface, live switching to persisted Simplified Chinese, weekly-only indicator and menu, reset refresh, manual and periodic refresh, wake refresh, login launch, real weekly quota percentage, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
+- Real acceptance verifies that the interface follows the macOS language without an in-app selector, the weekly-only indicator and menu, reset refresh, manual and periodic refresh, wake refresh, login launch, real weekly quota percentage, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
 - Reading limits must not start model work or consume model usage.
 - Idle operation must not continuously consume CPU.
 

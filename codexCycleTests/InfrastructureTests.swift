@@ -511,10 +511,10 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertLessThan(prerelease, newer)
     }
 
-    func testStableErrorClassification() {
+    func testStableErrorClassification() throws {
         XCTAssertEqual(DisplayErrorReason.classify(CodexLocatorError.notFound), .runtimeNotFound)
         XCTAssertEqual(
-            AppLocalization(language: .english).text(
+            try localization(for: "en").text(
                 DisplayErrorReason.classify(CodexLocatorError.notFound).localizationKey
             ),
             "Codex Runtime not found"
@@ -524,7 +524,7 @@ final class InfrastructureTests: XCTestCase {
             .incompatibleRuntime
         )
         XCTAssertEqual(
-            AppLocalization(language: .simplifiedChinese).text(
+            try localization(for: "zh-Hans").text(
                 DisplayErrorReason.classify(CodexLocatorError.incompatible).localizationKey
             ),
             "Codex Runtime 不兼容"
@@ -657,10 +657,12 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
-    func testMenuShowsOnlyWeeklyQuotaInBothLanguages() {
+    func testMenuShowsOnlyWeeklyQuotaInSupportedSystemLanguages() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let controller = StatusMenuController()
-        controller.update(
+        let englishController = StatusMenuController(
+            localization: try localization(for: "en")
+        )
+        englishController.update(
             state: .fresh(
                 WeeklyQuotaReading(
                     remainingPercent: 42,
@@ -673,22 +675,37 @@ final class InfrastructureTests: XCTestCase {
             now: now
         )
 
-        let presentation = controller.presentationSnapshot
+        let presentation = englishController.presentationSnapshot
 
         XCTAssertEqual(presentation.indicatorRemainingPercent, 42)
-        XCTAssertEqual(presentation.language, .english)
         XCTAssertEqual(presentation.weeklyTitle, "Weekly remaining      42%")
         XCTAssertEqual(presentation.resetTitle, "Resets in        1 day")
 
-        controller.setLanguage(.simplifiedChinese, now: now)
+        let chineseController = StatusMenuController(
+            localization: try localization(for: "zh-Hans")
+        )
+        chineseController.update(
+            state: .fresh(
+                WeeklyQuotaReading(
+                    remainingPercent: 42,
+                    resetsAt: now.addingTimeInterval(86_400),
+                    fetchedAt: now
+                )
+            ),
+            refreshing: false,
+            loginLaunchState: .enabled,
+            now: now
+        )
 
-        XCTAssertEqual(controller.presentationSnapshot.weeklyTitle, "周余量      42%")
-        XCTAssertEqual(controller.presentationSnapshot.resetTitle, "重置倒计时    1 天")
+        XCTAssertEqual(chineseController.presentationSnapshot.weeklyTitle, "周余量      42%")
+        XCTAssertEqual(chineseController.presentationSnapshot.resetTitle, "重置倒计时    1 天")
     }
 
     @MainActor
-    func testMenuKeepsWeeklyRowWhenQuotaIsUnavailable() {
-        let controller = StatusMenuController()
+    func testMenuKeepsWeeklyRowWhenQuotaIsUnavailable() throws {
+        let controller = StatusMenuController(
+            localization: try localization(for: "en")
+        )
         controller.update(
             state: .unavailable(.weeklyQuotaUnavailable),
             refreshing: false,
@@ -699,6 +716,17 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(
             controller.presentationSnapshot.errorTitle,
             "Reason           Weekly quota unavailable"
+        )
+    }
+
+    private func localization(for identifier: String) throws -> AppLocalization {
+        let path = try XCTUnwrap(
+            Bundle.main.path(forResource: identifier, ofType: "lproj")
+        )
+        let bundle = try XCTUnwrap(Bundle(path: path))
+        return AppLocalization(
+            bundle: bundle,
+            locale: Locale(identifier: identifier)
         )
     }
 

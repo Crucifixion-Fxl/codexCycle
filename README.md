@@ -17,9 +17,9 @@ uses your existing local Codex authentication.
 - The remaining arc follows a fixed red → yellow → green scale: red at `0`,
   yellow at `20`, and green from `50` through `100`.
 - Clicking the indicator opens the weekly reading, reset countdown, last update
-  time, manual refresh, and language controls.
-- English is the first-launch default. You can switch to Simplified Chinese
-  immediately; the app remembers your choice.
+  time, and manual refresh.
+- The interface follows the language selected by macOS. English and Simplified
+  Chinese are supported; there is no separate in-app language setting.
 
 ## Display logic
 
