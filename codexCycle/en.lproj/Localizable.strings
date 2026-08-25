@@ -1,5 +1,7 @@
+"menu.five_hour_remaining" = "5-hour remaining";
+"menu.five_hour_reset_countdown" = "5-hour resets in  %@";
 "menu.weekly_remaining" = "Weekly remaining";
-"menu.reset_countdown" = "Resets in        %@";
+"menu.weekly_reset_countdown" = "Weekly resets in  %@";
 "menu.last_updated" = "Last updated     %@";
 "menu.reason" = "Reason           %@";
 "menu.stale_suffix" = " (stale)";
@@ -22,12 +24,14 @@
 "error.runtime_not_found" = "Codex Runtime not found";
 "error.incompatible_runtime" = "Codex Runtime incompatible";
 "error.not_logged_in" = "Codex is not signed in";
-"error.weekly_quota_unavailable" = "Weekly quota unavailable";
+"error.supported_limits_missing" = "5-hour and weekly quotas unavailable";
 "error.network_failure" = "Network connection failed";
 "error.service_unavailable" = "Codex service temporarily unavailable";
 
 "diagnostic.runtime" = "Codex Runtime";
 "diagnostic.runtime_version" = "Codex version";
+"diagnostic.five_hour_remaining" = "5-hour remaining";
+"diagnostic.five_hour_reset" = "5-hour reset timestamp";
 "diagnostic.weekly_remaining" = "Weekly remaining";
 "diagnostic.weekly_reset" = "Weekly reset timestamp";
 "diagnostic.failure" = "Diagnostic failed";

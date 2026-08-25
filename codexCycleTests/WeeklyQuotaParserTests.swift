@@ -1,10 +1,10 @@
 import XCTest
 @testable import codexCycle
 
-final class WeeklyQuotaParserTests: XCTestCase {
+final class QuotaUsageParserTests: XCTestCase {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func testReadsWeeklyWindowAndIgnoresFiveHourWindow() throws {
+    func testReadsExactFiveHourAndWeeklyWindowsFromMainCodexBucket() throws {
         let response = GetAccountRateLimitsResult(
             rateLimits: RateLimitSnapshot(
                 limitId: "codex",
@@ -22,17 +22,21 @@ final class WeeklyQuotaParserTests: XCTestCase {
             rateLimitsByLimitId: nil
         )
 
-        let reading = try WeeklyQuotaParser.parse(response, fetchedAt: now)
+        let snapshot = try QuotaUsageParser.parse(response, fetchedAt: now)
 
-        XCTAssertEqual(reading.remainingPercent, 40)
+        XCTAssertEqual(snapshot.fiveHour?.remainingPercent, 75)
         XCTAssertEqual(
-            reading.resetsAt,
+            snapshot.fiveHour?.resetsAt,
+            Date(timeIntervalSince1970: 1_800_010_000)
+        )
+        XCTAssertEqual(snapshot.weekly?.remainingPercent, 40)
+        XCTAssertEqual(
+            snapshot.weekly?.resetsAt,
             Date(timeIntervalSince1970: 1_800_100_000)
         )
-        XCTAssertEqual(reading.fetchedAt, now)
     }
 
-    func testReadsWeeklyWindowFromPrimary() throws {
+    func testReadsFiveHourFromSecondaryAndWeeklyFromPrimary() throws {
         let response = GetAccountRateLimitsResult(
             rateLimits: RateLimitSnapshot(
                 limitId: "codex",
@@ -50,43 +54,48 @@ final class WeeklyQuotaParserTests: XCTestCase {
             rateLimitsByLimitId: nil
         )
 
-        XCTAssertEqual(
-            try WeeklyQuotaParser.parse(response, fetchedAt: now).remainingPercent,
-            60
-        )
+        let snapshot = try QuotaUsageParser.parse(response, fetchedAt: now)
+
+        XCTAssertEqual(snapshot.fiveHour?.remainingPercent, 90)
+        XCTAssertEqual(snapshot.weekly?.remainingPercent, 60)
     }
 
-    func testUsesOnlyMainCodexBucket() throws {
+    func testUsesOnlyMainCodexBucketAndAcceptsPartialAvailability() throws {
         let response = GetAccountRateLimitsResult(
             rateLimits: snapshot(id: "codex", used: 99, duration: 300),
             rateLimitsByLimitId: [
                 "codex_other": snapshot(id: "codex_other", used: 90, duration: 10_080),
-                "codex": snapshot(
-                    id: "codex",
-                    used: 3,
-                    duration: 10_080,
-                    reset: 1_800_100_000
-                )
+                "codex": snapshot(id: "codex", used: 3, duration: 10_080)
             ]
         )
 
-        let reading = try WeeklyQuotaParser.parse(response, fetchedAt: now)
+        let result = try QuotaUsageParser.parse(response, fetchedAt: now)
 
-        XCTAssertEqual(reading.remainingPercent, 97)
-        XCTAssertEqual(
-            reading.resetsAt,
-            Date(timeIntervalSince1970: 1_800_100_000)
-        )
+        XCTAssertNil(result.fiveHour)
+        XCTAssertEqual(result.weekly?.remainingPercent, 97)
+        XCTAssertEqual(result.weekly?.fetchedAt, now)
     }
 
-    func testRejectsFiveHourOnlyResponse() {
+    func testAcceptsFiveHourOnlyResponse() throws {
         let response = GetAccountRateLimitsResult(
             rateLimits: snapshot(id: "codex", used: 12, duration: 300),
             rateLimitsByLimitId: nil
         )
 
-        XCTAssertThrowsError(try WeeklyQuotaParser.parse(response, fetchedAt: now)) {
-            XCTAssertEqual($0 as? WeeklyQuotaError, .weeklyWindowUnavailable)
+        let snapshot = try QuotaUsageParser.parse(response, fetchedAt: now)
+
+        XCTAssertEqual(snapshot.fiveHour?.remainingPercent, 88)
+        XCTAssertNil(snapshot.weekly)
+    }
+
+    func testRejectsUnsupportedWindow() {
+        let response = GetAccountRateLimitsResult(
+            rateLimits: snapshot(id: "codex", used: 12, duration: 60),
+            rateLimitsByLimitId: nil
+        )
+
+        XCTAssertThrowsError(try QuotaUsageParser.parse(response, fetchedAt: now)) {
+            XCTAssertEqual($0 as? QuotaUsageError, .noSupportedWindows)
         }
     }
 
@@ -96,8 +105,8 @@ final class WeeklyQuotaParserTests: XCTestCase {
             rateLimitsByLimitId: nil
         )
 
-        XCTAssertThrowsError(try WeeklyQuotaParser.parse(response, fetchedAt: now)) {
-            XCTAssertEqual($0 as? WeeklyQuotaError, .noMainCodexBucket)
+        XCTAssertThrowsError(try QuotaUsageParser.parse(response, fetchedAt: now)) {
+            XCTAssertEqual($0 as? QuotaUsageError, .noMainCodexBucket)
         }
     }
 
@@ -107,30 +116,41 @@ final class WeeklyQuotaParserTests: XCTestCase {
             rateLimitsByLimitId: nil
         )
         let overused = GetAccountRateLimitsResult(
-            rateLimits: snapshot(id: "codex", used: 104, duration: 10_080),
+            rateLimits: snapshot(id: "codex", used: 104, duration: 300),
             rateLimitsByLimitId: nil
         )
 
         XCTAssertEqual(
-            try WeeklyQuotaParser.parse(fractional, fetchedAt: now).remainingPercent,
+            try QuotaUsageParser.parse(fractional, fetchedAt: now)
+                .weekly?.remainingPercent,
             19
         )
         XCTAssertEqual(
-            try WeeklyQuotaParser.parse(overused, fetchedAt: now).remainingPercent,
+            try QuotaUsageParser.parse(overused, fetchedAt: now)
+                .fiveHour?.remainingPercent,
             0
         )
     }
 
-    func testAcceptsReadingWithoutResetTimestamp() throws {
-        let response = GetAccountRateLimitsResult(
-            rateLimits: snapshot(id: "codex", used: 25, duration: 10_080),
-            rateLimitsByLimitId: nil
+    func testExpiresWindowsIndependently() {
+        let weekly = QuotaUsageReading(
+            remainingPercent: 42,
+            resetsAt: now.addingTimeInterval(86_400),
+            fetchedAt: now
+        )
+        let snapshot = QuotaUsageSnapshot(
+            fiveHour: QuotaUsageReading(
+                remainingPercent: 75,
+                resetsAt: now.addingTimeInterval(-1),
+                fetchedAt: now
+            ),
+            weekly: weekly
         )
 
-        let reading = try WeeklyQuotaParser.parse(response, fetchedAt: now)
-
-        XCTAssertEqual(reading.remainingPercent, 75)
-        XCTAssertNil(reading.resetsAt)
+        XCTAssertEqual(
+            snapshot.removingExpiredReadings(at: now),
+            QuotaUsageSnapshot(fiveHour: nil, weekly: weekly)
+        )
     }
 
     private func snapshot(

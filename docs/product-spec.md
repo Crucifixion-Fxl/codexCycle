@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentage in the main Codex weekly quota window. It has no Dock icon, main window, quota selector, notifications, telemetry, updater, or login flow.
+`codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentages in the main Codex five-hour and weekly quota windows. The status indicator remains weekly; the detail menu shows both windows. It has no Dock icon, main window, quota selector, notifications, telemetry, updater, or login flow.
 
 The interface follows the language selected by macOS. English and Simplified Chinese are supported, with English as the fallback for other system languages. The app has no independent language setting.
 
@@ -31,12 +31,12 @@ The interface follows the language selected by macOS. English and Simplified Chi
 - Never read, copy, store, display, or log Codex credentials.
 - If Codex is not logged in, show the unavailable state and instruct the user to log in through the corresponding Codex product separately; `codexCycle` does not open a terminal, desktop app, or browser.
 
-## Weekly quota and remaining calculation
+## Supported quota windows and remaining calculation
 
 - Read only the main `codex` metering bucket.
-- Treat only `windowDurationMins == 10080` as the weekly window. It may appear as the primary or secondary window.
+- Treat only `windowDurationMins == 300` as the five-hour window and `windowDurationMins == 10080` as the weekly window. Either may appear as the primary or secondary window.
 - Never infer a window from its field position, name, or reset time. Ignore credits, plan type, reset credits, other durations, and other model or feature buckets.
-- If the weekly window is missing, the usage state is unavailable. Never substitute a five-hour or other window.
+- The two supported windows are independently optional. Never substitute one window for the other. If neither is present, the usage state is unavailable.
 - Displayed remaining percentage is `floor(100 - usedPercent)`, clamped to `0...100`.
 - The center of the indicator contains the integer only, with no percent sign.
 - A valid percentage remains usable if `resetsAt` is absent, but its reset countdown is `—` and it is not persisted across app restarts.
@@ -51,8 +51,11 @@ The interface follows the language selected by macOS. English and Simplified Chi
 - Coalesce overlapping launch, timer, wake, manual, and event-triggered refreshes into one request.
 - Ordinary failures wait for the next scheduled or manual attempt. A child-process crash uses the restart backoff above.
 - While refreshing, keep a valid existing reading unchanged. With no reading, show a gray `—`. Disable repeated manual refresh until the request completes.
-- Expire the weekly reading exactly at its reset boundary and refresh immediately.
-- A successful response that omits the weekly window immediately marks it unavailable and invalidates its old reading. This is not a transport failure and must not preserve stale data.
+- Expire each reading exactly at its own reset boundary and refresh immediately while retaining the other valid window.
+- A successful response immediately invalidates old readings for any supported window it omits. This is not a transport failure and must not preserve stale data.
+- At 7:00 AM in the current system time zone, run one minimal Codex request and then refresh quota data. Persist the attempt date so restarts and wakes do not duplicate the request on the same calendar day.
+- If the app is not running or the Mac is asleep at 7:00 AM, perform the missed request once after the next launch or wake that same day.
+- Run the daily request through the selected validated Runtime as `codex --ask-for-approval never exec --ephemeral --ignore-user-config --sandbox read-only --skip-git-repo-check`. The prompt requires a one-word response without tools or file inspection. Suppress process input and output and stop it after 90 seconds.
 
 ## Indicator
 
@@ -72,43 +75,47 @@ The interface follows the language selected by macOS. English and Simplified Chi
 The app has no main window. Clicking the indicator opens the detail menu in the interface language selected by macOS. In English, the menu appears:
 
 ```text
-Weekly remaining    42%
-Resets in            3 hours 18 minutes
-Last updated         3 minutes ago
+5-hour remaining      75%
+5-hour resets in      3 hours 18 minutes
+Weekly remaining      42%
+Weekly resets in      2 days 3 hours
+Last updated          3 minutes ago
 ────────────
 Refresh Now
 ────────────
 Quit codexCycle
 ```
 
-When the weekly window is unavailable, the menu retains the same shape:
+When both windows are unavailable, the menu retains the same shape:
 
 ```text
+5-hour remaining    —
+5-hour resets in    —
 Weekly remaining    —
-Resets in           —
+Weekly resets in    —
 Last updated        —
-Reason              Weekly quota unavailable
+Reason              5-hour and weekly quotas unavailable
 ```
 
-- The weekly row is read-only, includes `%` when available, and shows `—` otherwise. The center indicator omits `%`.
-- The reset countdown and status colors always correspond to the weekly reading.
+- Both quota rows are read-only, include `%` when available, and show `—` otherwise. The center indicator continues to show the weekly reading and omits `%`.
+- Each reset countdown corresponds to its own window. Status-indicator colors always correspond to the weekly reading.
 - The reset countdown uses at most two units and no seconds: `2 days 3 hours`, `4 hours 18 minutes`, or `less than 1 minute` in English, with equivalent Simplified Chinese text.
 - The menu recalculates relative times at least once per minute while the app runs.
-- Errors add one short localized reason when the weekly window is unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, weekly quota unavailable, network failure, or Codex service unavailable.
+- Errors add one short localized reason when both supported windows are unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, supported quotas unavailable, network failure, or Codex service unavailable.
 - The menu and read-only diagnostics use the localization selected by macOS. The app does not override that choice or store a language preference.
 - If login launch is disabled, show that state and provide a localized action that opens Login Items Settings.
 - The localized `Quit codexCycle` action stops the current process but leaves launch-at-login registered.
 
 ## Cached state and failure behavior
 
-- Store only the last successful weekly reading, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. The reading contains its percentage, reset timestamp, and fetch timestamp.
+- Store only the last successful five-hour and weekly readings, the last daily-request attempt date, verified Runtime path and version, and login-registration attempt in the app's `UserDefaults`. Each reading contains its percentage, reset timestamp, and fetch timestamp.
 - Remove the obsolete `display.language` preference during upgrade so an earlier in-app choice cannot override the system-selected localization.
-- Persist the weekly reading only when it has a reset timestamp.
-- On launch, restore a non-expired reading as gray and stale until a live refresh succeeds.
-- Expire and discard the cached reading at its reset timestamp, then refresh immediately.
+- Persist a reading only when it has a reset timestamp.
+- On launch, restore non-expired readings as gray and stale until a live refresh succeeds.
+- Expire and discard each cached reading at its own reset timestamp, then refresh immediately.
 - A total refresh failure retains a non-expired reading as gray stale data and shows the last successful update plus a short reason.
-- A successful response without the weekly window clears the cached reading; it does not reuse it as stale data.
-- During upgrade, retain a valid `usage.weekly.*` cache and remove five-hour, legacy-weekly, and preferred-view keys.
+- A successful response without a previously cached supported window clears that window; it does not reuse it as stale data.
+- During upgrade, retain valid `usage.fiveHour.*` and `usage.weekly.*` caches, migrate legacy weekly data, and remove the obsolete preferred-view key.
 - Detailed errors use macOS unified logging. Logs exclude tokens, account information, credentials, and full protocol payloads.
 
 ## Launch, privacy, and lifecycle
@@ -132,10 +139,10 @@ Reason              Weekly quota unavailable
 
 ## Verification
 
-- Unit tests cover exact weekly-window selection in either field, rejection of five-hour-only responses, remaining calculation, system-selected localization with English and Simplified-Chinese resources, gradient bands, countdown formatting, cache expiration and migration, and error classification.
+- Unit tests cover exact five-hour and weekly-window selection in either field, partial availability, remaining calculation, daily 7:00 scheduling and same-day deduplication, safe ephemeral exec arguments, system-selected localization with English and Simplified-Chinese resources, gradient bands, countdown formatting, independent cache expiration and migration, and error classification.
 - A fake JSONL app-server process covers initialization, timeout, process exit, sparse-update handling, and full-snapshot refresh without a real account.
-- Real acceptance verifies that the interface follows the macOS language without an in-app selector, the weekly-only indicator and menu, reset refresh, manual and periodic refresh, wake refresh, login launch, real weekly quota percentage, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
-- Reading limits must not start model work or consume model usage.
+- Real acceptance verifies that the interface follows the macOS language without an in-app selector, the weekly indicator and dual-window menu, reset refresh, manual and periodic refresh, wake refresh, daily Codex request, login launch, real quota percentages, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
+- Reading limits must not start model work or consume model usage. Only the explicit daily 7:00 refresh request starts a minimal Codex turn and consumes a small amount of the user's quota.
 - Idle operation must not continuously consume CPU.
 
 ## Primary references

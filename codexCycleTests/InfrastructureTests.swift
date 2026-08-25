@@ -530,8 +530,8 @@ final class InfrastructureTests: XCTestCase {
             "Codex Runtime 不兼容"
         )
         XCTAssertEqual(
-            DisplayErrorReason.classify(WeeklyQuotaError.weeklyWindowUnavailable),
-            .weeklyQuotaUnavailable
+            DisplayErrorReason.classify(QuotaUsageError.noSupportedWindows),
+            .supportedLimitsMissing
         )
         XCTAssertEqual(
             DisplayErrorReason.classify(
@@ -657,17 +657,24 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
-    func testMenuShowsOnlyWeeklyQuotaInSupportedSystemLanguages() throws {
+    func testMenuShowsFiveHourAndWeeklyQuotaInSupportedSystemLanguages() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let englishController = StatusMenuController(
             localization: try localization(for: "en")
         )
         englishController.update(
             state: .fresh(
-                WeeklyQuotaReading(
-                    remainingPercent: 42,
-                    resetsAt: now.addingTimeInterval(86_400),
-                    fetchedAt: now
+                QuotaUsageSnapshot(
+                    fiveHour: QuotaUsageReading(
+                        remainingPercent: 75,
+                        resetsAt: now.addingTimeInterval(3_600),
+                        fetchedAt: now
+                    ),
+                    weekly: QuotaUsageReading(
+                        remainingPercent: 42,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        fetchedAt: now
+                    )
                 )
             ),
             refreshing: false,
@@ -678,18 +685,27 @@ final class InfrastructureTests: XCTestCase {
         let presentation = englishController.presentationSnapshot
 
         XCTAssertEqual(presentation.indicatorRemainingPercent, 42)
+        XCTAssertEqual(presentation.fiveHourTitle, "5-hour remaining      75%")
+        XCTAssertEqual(presentation.fiveHourResetTitle, "5-hour resets in  1 hour")
         XCTAssertEqual(presentation.weeklyTitle, "Weekly remaining      42%")
-        XCTAssertEqual(presentation.resetTitle, "Resets in        1 day")
+        XCTAssertEqual(presentation.weeklyResetTitle, "Weekly resets in  1 day")
 
         let chineseController = StatusMenuController(
             localization: try localization(for: "zh-Hans")
         )
         chineseController.update(
             state: .fresh(
-                WeeklyQuotaReading(
-                    remainingPercent: 42,
-                    resetsAt: now.addingTimeInterval(86_400),
-                    fetchedAt: now
+                QuotaUsageSnapshot(
+                    fiveHour: QuotaUsageReading(
+                        remainingPercent: 75,
+                        resetsAt: now.addingTimeInterval(3_600),
+                        fetchedAt: now
+                    ),
+                    weekly: QuotaUsageReading(
+                        remainingPercent: 42,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        fetchedAt: now
+                    )
                 )
             ),
             refreshing: false,
@@ -697,25 +713,28 @@ final class InfrastructureTests: XCTestCase {
             now: now
         )
 
+        XCTAssertEqual(chineseController.presentationSnapshot.fiveHourTitle, "5 小时余量      75%")
+        XCTAssertEqual(chineseController.presentationSnapshot.fiveHourResetTitle, "5 小时重置    1 小时")
         XCTAssertEqual(chineseController.presentationSnapshot.weeklyTitle, "周余量      42%")
-        XCTAssertEqual(chineseController.presentationSnapshot.resetTitle, "重置倒计时    1 天")
+        XCTAssertEqual(chineseController.presentationSnapshot.weeklyResetTitle, "周重置倒计时  1 天")
     }
 
     @MainActor
-    func testMenuKeepsWeeklyRowWhenQuotaIsUnavailable() throws {
+    func testMenuKeepsBothRowsWhenQuotaIsUnavailable() throws {
         let controller = StatusMenuController(
             localization: try localization(for: "en")
         )
         controller.update(
-            state: .unavailable(.weeklyQuotaUnavailable),
+            state: .unavailable(.supportedLimitsMissing),
             refreshing: false,
             loginLaunchState: .enabled
         )
 
+        XCTAssertEqual(controller.presentationSnapshot.fiveHourTitle, "5-hour remaining      —")
         XCTAssertEqual(controller.presentationSnapshot.weeklyTitle, "Weekly remaining      —")
         XCTAssertEqual(
             controller.presentationSnapshot.errorTitle,
-            "Reason           Weekly quota unavailable"
+            "Reason           5-hour and weekly quotas unavailable"
         )
     }
 

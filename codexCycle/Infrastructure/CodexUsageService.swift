@@ -5,7 +5,7 @@ enum DisplayErrorReason: Equatable {
     case runtimeNotFound
     case incompatibleRuntime
     case notLoggedIn
-    case weeklyQuotaUnavailable
+    case supportedLimitsMissing
     case networkFailure
     case serviceUnavailable
 
@@ -17,8 +17,8 @@ enum DisplayErrorReason: Equatable {
             return "error.incompatible_runtime"
         case .notLoggedIn:
             return "error.not_logged_in"
-        case .weeklyQuotaUnavailable:
-            return "error.weekly_quota_unavailable"
+        case .supportedLimitsMissing:
+            return "error.supported_limits_missing"
         case .networkFailure:
             return "error.network_failure"
         case .serviceUnavailable:
@@ -36,11 +36,8 @@ enum DisplayErrorReason: Equatable {
             }
         }
 
-        if let quotaError = error as? WeeklyQuotaError {
-            switch quotaError {
-            case .noMainCodexBucket, .weeklyWindowUnavailable:
-                return .weeklyQuotaUnavailable
-            }
+        if error is QuotaUsageError {
+            return .supportedLimitsMissing
         }
 
         if let appServerError = error as? AppServerClientError {
@@ -80,14 +77,24 @@ enum DisplayErrorReason: Equatable {
     }
 }
 
+enum DailyCodexRequestError: Error {
+    case runtimeUnavailable
+    case launchFailed(String)
+    case processExited(Int32)
+    case timedOut
+}
+
 final class CodexUsageService {
     private let locator: CodexLocator
     private let preferences: AppPreferences
     private let logger = Logger(subsystem: "com.fxl.codexCycle", category: "usage-service")
 
     private var client: AppServerClient?
+    private var activeCandidate: CodexCandidate?
     private var connecting = false
-    private var queuedCompletions: [(Result<WeeklyQuotaReading, Error>) -> Void] = []
+    private var queuedCompletions: [(Result<QuotaUsageSnapshot, Error>) -> Void] = []
+    private var dailyRequestProcess: Process?
+    private var dailyRequestTimeout: DispatchWorkItem?
 
     var onRateLimitsUpdated: (() -> Void)?
     var onUnexpectedTermination: ((Error) -> Void)?
@@ -100,11 +107,11 @@ final class CodexUsageService {
         self.preferences = preferences
     }
 
-    func fetch(completion: @escaping (Result<WeeklyQuotaReading, Error>) -> Void) {
+    func fetch(completion: @escaping (Result<QuotaUsageSnapshot, Error>) -> Void) {
         dispatchPrecondition(condition: .onQueue(.main))
 
         if let client {
-            readWeeklyQuota(from: client, completion: completion)
+            readQuotaUsage(from: client, completion: completion)
             return
         }
 
@@ -124,10 +131,77 @@ final class CodexUsageService {
         }
     }
 
+    @discardableResult
+    func startDailyCodexRequest(
+        timeout: TimeInterval = 90,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) -> Bool {
+        dispatchPrecondition(condition: .onQueue(.main))
+        guard dailyRequestProcess == nil else { return false }
+        guard let candidate = activeCandidate else {
+            return false
+        }
+
+        let configuration = CodexExecLaunchConfiguration.dailyQuotaRefresh(
+            at: candidate.executableURL,
+            executableSearchPath: candidate.executableSearchPath
+        )
+        let process = Process()
+        process.executableURL = configuration.executableURL
+        process.arguments = configuration.arguments
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        process.terminationHandler = { [weak self, weak process] terminated in
+            DispatchQueue.main.async {
+                guard let self, self.dailyRequestProcess === process else { return }
+                self.dailyRequestTimeout?.cancel()
+                self.dailyRequestTimeout = nil
+                self.dailyRequestProcess = nil
+                if terminated.terminationStatus == 0 {
+                    completion(.success(()))
+                } else {
+                    completion(.failure(
+                        DailyCodexRequestError.processExited(terminated.terminationStatus)
+                    ))
+                }
+            }
+        }
+
+        do {
+            try process.run()
+        } catch {
+            logger.error("Failed to launch daily Codex quota-refresh request")
+            return false
+        }
+
+        dailyRequestProcess = process
+        let timeoutWork = DispatchWorkItem { [weak self, weak process] in
+            guard let self, self.dailyRequestProcess === process else { return }
+            self.dailyRequestProcess = nil
+            self.dailyRequestTimeout = nil
+            if process?.isRunning == true {
+                process?.terminate()
+            }
+            completion(.failure(DailyCodexRequestError.timedOut))
+        }
+        dailyRequestTimeout = timeoutWork
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
+        return true
+    }
+
     func stop() {
         dispatchPrecondition(condition: .onQueue(.main))
+        dailyRequestTimeout?.cancel()
+        dailyRequestTimeout = nil
+        if dailyRequestProcess?.isRunning == true {
+            dailyRequestProcess?.terminate()
+        }
+        dailyRequestProcess = nil
         client?.stop()
         client = nil
+        activeCandidate = nil
         connecting = false
         queuedCompletions.removeAll()
     }
@@ -136,6 +210,7 @@ final class CodexUsageService {
         dispatchPrecondition(condition: .onQueue(.main))
         client?.stop()
         client = nil
+        activeCandidate = nil
     }
 
     private func tryCandidate(_ candidates: [CodexCandidate], at index: Int) {
@@ -158,6 +233,7 @@ final class CodexUsageService {
         candidateClient.onUnexpectedTermination = { [weak self, weak candidateClient] error in
             guard let self, self.client === candidateClient else { return }
             self.client = nil
+            self.activeCandidate = nil
             self.onUnexpectedTermination?(error)
         }
 
@@ -170,11 +246,10 @@ final class CodexUsageService {
                     switch response {
                     case .success(let payload):
                         self.client = candidateClient
-                        self.preferences.selectedCodexPath = candidate.launcherURL.path
-                        self.preferences.selectedCodexVersion = candidate.version.description
+                        self.activeCandidate = candidate
+                        self.remember(candidate)
                         do {
-                            let reading = try WeeklyQuotaParser.parse(payload)
-                            self.finishConnection(.success(reading))
+                            self.finishConnection(.success(try QuotaUsageParser.parse(payload)))
                         } catch {
                             self.finishConnection(.failure(error))
                         }
@@ -183,10 +258,9 @@ final class CodexUsageService {
                             candidateClient.stop()
                             self.tryCandidate(candidates, at: index + 1)
                         } else {
-                            // The protocol is present even if account or network state blocks this read.
                             self.client = candidateClient
-                            self.preferences.selectedCodexPath = candidate.launcherURL.path
-                            self.preferences.selectedCodexVersion = candidate.version.description
+                            self.activeCandidate = candidate
+                            self.remember(candidate)
                             self.finishConnection(.failure(error))
                         }
                     }
@@ -198,22 +272,27 @@ final class CodexUsageService {
         }
     }
 
-    private func finishConnection(_ result: Result<WeeklyQuotaReading, Error>) {
+    private func remember(_ candidate: CodexCandidate) {
+        preferences.selectedCodexPath = candidate.launcherURL.path
+        preferences.selectedCodexVersion = candidate.version.description
+    }
+
+    private func finishConnection(_ result: Result<QuotaUsageSnapshot, Error>) {
         connecting = false
         let completions = queuedCompletions
         queuedCompletions.removeAll()
         completions.forEach { $0(result) }
     }
 
-    private func readWeeklyQuota(
+    private func readQuotaUsage(
         from client: AppServerClient,
-        completion: @escaping (Result<WeeklyQuotaReading, Error>) -> Void
+        completion: @escaping (Result<QuotaUsageSnapshot, Error>) -> Void
     ) {
         client.readRateLimits { result in
             switch result {
             case .success(let payload):
                 do {
-                    completion(.success(try WeeklyQuotaParser.parse(payload)))
+                    completion(.success(try QuotaUsageParser.parse(payload)))
                 } catch {
                     completion(.failure(error))
                 }

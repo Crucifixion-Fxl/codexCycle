@@ -51,9 +51,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menuController = StatusMenuController()
         let coordinator = RefreshCoordinator(
             service: service,
-            cache: UserDefaultsWeeklyQuotaCache(),
+            cache: UserDefaultsQuotaUsageCache(),
             menuController: menuController,
-            loginItemManager: loginItemManager
+            loginItemManager: loginItemManager,
+            preferences: preferences
         )
 
         self.coordinator = coordinator
@@ -74,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         service.fetch { [weak self] result in
             switch result {
-            case .success(let reading):
+            case .success(let snapshot):
                 print(
                     "\(localization.text("diagnostic.runtime")): "
                         + "\(preferences.selectedCodexPath ?? "—")"
@@ -84,12 +85,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         + "\(preferences.selectedCodexVersion ?? "—")"
                 )
                 print(
+                    "\(localization.text("diagnostic.five_hour_remaining")): "
+                        + "\(snapshot.fiveHour?.remainingPercent.description ?? "—")%"
+                )
+                print(
+                    "\(localization.text("diagnostic.five_hour_reset")): "
+                        + "\(snapshot.fiveHour?.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                )
+                print(
                     "\(localization.text("diagnostic.weekly_remaining")): "
-                        + "\(reading.remainingPercent)%"
+                        + "\(snapshot.weekly?.remainingPercent.description ?? "—")%"
                 )
                 print(
                     "\(localization.text("diagnostic.weekly_reset")): "
-                        + "\(reading.resetsAt?.timeIntervalSince1970.description ?? "—")"
+                        + "\(snapshot.weekly?.resetsAt?.timeIntervalSince1970.description ?? "—")"
                 )
             case .failure(let error):
                 print(

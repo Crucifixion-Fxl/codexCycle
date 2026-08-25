@@ -21,6 +21,33 @@ struct AppServerLaunchConfiguration {
     }
 }
 
+struct CodexExecLaunchConfiguration: Equatable {
+    let executableURL: URL
+    let arguments: [String]
+
+    static func dailyQuotaRefresh(
+        at executableURL: URL,
+        executableSearchPath: String
+    ) -> CodexExecLaunchConfiguration {
+        CodexExecLaunchConfiguration(
+            executableURL: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "PATH=\(executableSearchPath)",
+                executableURL.path,
+                "--ask-for-approval",
+                "never",
+                "exec",
+                "--ephemeral",
+                "--ignore-user-config",
+                "--sandbox",
+                "read-only",
+                "--skip-git-repo-check",
+                "Reply with OK only. Do not use tools or inspect files."
+            ]
+        )
+    }
+}
+
 enum AppServerClientError: Error {
     case launchFailed(String)
     case notRunning

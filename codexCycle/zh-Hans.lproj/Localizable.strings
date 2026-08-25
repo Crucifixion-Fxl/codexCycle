@@ -1,5 +1,7 @@
+"menu.five_hour_remaining" = "5 小时余量";
+"menu.five_hour_reset_countdown" = "5 小时重置    %@";
 "menu.weekly_remaining" = "周余量";
-"menu.reset_countdown" = "重置倒计时    %@";
+"menu.weekly_reset_countdown" = "周重置倒计时  %@";
 "menu.last_updated" = "最后更新      %@";
 "menu.reason" = "原因          %@";
 "menu.stale_suffix" = "（旧数据）";
@@ -22,12 +24,14 @@
 "error.runtime_not_found" = "未找到 Codex Runtime";
 "error.incompatible_runtime" = "Codex Runtime 不兼容";
 "error.not_logged_in" = "Codex 尚未登录";
-"error.weekly_quota_unavailable" = "周限额不可用";
+"error.supported_limits_missing" = "5 小时和周限额均不可用";
 "error.network_failure" = "网络连接失败";
 "error.service_unavailable" = "Codex 服务暂时不可用";
 
 "diagnostic.runtime" = "Codex Runtime";
 "diagnostic.runtime_version" = "Codex 版本";
+"diagnostic.five_hour_remaining" = "5 小时余量";
+"diagnostic.five_hour_reset" = "5 小时重置时间戳";
 "diagnostic.weekly_remaining" = "周余量";
 "diagnostic.weekly_reset" = "周重置时间戳";
 "diagnostic.failure" = "诊断失败";

@@ -2,9 +2,9 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-`codexCycle` is a lightweight macOS menu-bar app that keeps your weekly Codex
-quota visible without opening another window. It refreshes automatically and
-uses your existing local Codex authentication.
+`codexCycle` is a lightweight macOS menu-bar app that keeps your five-hour and
+weekly Codex quotas visible without opening another window. It refreshes
+automatically and uses your existing local Codex authentication.
 
 <p align="center">
   <img src="docs/images/codexcycle-status-item.png" width="100" alt="codexCycle menu-bar indicator showing 85 percent remaining">
@@ -16,21 +16,24 @@ uses your existing local Codex authentication.
   omits the `%` sign to stay readable at menu-bar size.
 - The remaining arc follows a fixed red → yellow → green scale: red at `0`,
   yellow at `20`, and green from `50` through `100`.
-- Clicking the indicator opens the weekly reading, reset countdown, last update
-  time, and manual refresh.
+- Clicking the indicator opens the five-hour and weekly readings, their reset
+  countdowns, the last update time, and manual refresh.
 - The interface follows the language selected by macOS. English and Simplified
   Chinese are supported; there is no separate in-app language setting.
 
 ## Display logic
 
-- Only the main `codex` bucket's exact seven-day window is shown. Other windows
-  are ignored rather than substituted.
+- Only the main `codex` bucket's exact five-hour and seven-day windows are shown.
+  Other windows are ignored rather than substituted.
 - Remaining quota is `floor(100 - usedPercent)`, clamped to `0...100`.
 - A failed refresh keeps a valid cached number but turns the ring gray. A reading
   expires at its reset boundary; no valid reading is shown as `—`.
 - Reset time is relative, uses at most two units, and never displays seconds.
 - Data refreshes on launch, every five minutes, after wake, after a quota update,
-  at the weekly reset boundary, and on manual refresh.
+  at either reset boundary, and on manual refresh.
+- At 7:00 AM local time each day, the app makes one minimal, ephemeral, read-only
+  Codex request to start or roll the five-hour window, then reads the quotas
+  again. A sleeping or closed Mac catches up once after the next wake or launch.
 
 ## Requirements
 
@@ -70,9 +73,11 @@ make purge      # Remove the app and its preferences
 ## Data and privacy
 
 `codexCycle` reads `account/rateLimits/read` from a local
-`codex app-server --stdio` process. It does not read or store credentials, make
-direct network requests, collect analytics, or send telemetry. Runtime
-executables are validated before launch.
+`codex app-server --stdio` process. The daily request runs through the validated
+local Runtime as an ephemeral `codex exec` session with a read-only sandbox,
+tools disabled by instruction, and user configuration ignored. The app does not
+read or store credentials, make direct network requests, collect analytics, or
+send telemetry. Runtime executables are validated before launch.
 
 For implementation details, see the [product specification](docs/product-spec.md)
 and the [runtime](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md)

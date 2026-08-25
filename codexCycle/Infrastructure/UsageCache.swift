@@ -1,18 +1,23 @@
 import Foundation
 
-protocol WeeklyQuotaCaching {
-    func load(now: Date) -> WeeklyQuotaReading?
-    func save(_ reading: WeeklyQuotaReading)
+protocol QuotaUsageCaching {
+    func load(now: Date) -> QuotaUsageSnapshot?
+    func save(_ snapshot: QuotaUsageSnapshot)
     func clear()
 }
 
-final class UserDefaultsWeeklyQuotaCache: WeeklyQuotaCaching {
+final class UserDefaultsQuotaUsageCache: QuotaUsageCaching {
     private struct Keys {
         let remainingPercent: String
         let resetsAt: String
         let fetchedAt: String
     }
 
+    private static let fiveHourKeys = Keys(
+        remainingPercent: "usage.fiveHour.remainingPercent",
+        resetsAt: "usage.fiveHour.resetsAt",
+        fetchedAt: "usage.fiveHour.fetchedAt"
+    )
     private static let weeklyKeys = Keys(
         remainingPercent: "usage.weekly.remainingPercent",
         resetsAt: "usage.weekly.resetsAt",
@@ -23,12 +28,6 @@ final class UserDefaultsWeeklyQuotaCache: WeeklyQuotaCaching {
         resetsAt: "usage.resetsAt",
         fetchedAt: "usage.fetchedAt"
     )
-    private static let obsoleteKeys = [
-        "usage.fiveHour.remainingPercent",
-        "usage.fiveHour.resetsAt",
-        "usage.fiveHour.fetchedAt",
-        "usage.preferredQuotaWindow"
-    ]
 
     private let defaults: UserDefaults
 
@@ -36,34 +35,40 @@ final class UserDefaultsWeeklyQuotaCache: WeeklyQuotaCaching {
         self.defaults = defaults
     }
 
-    func load(now: Date = Date()) -> WeeklyQuotaReading? {
-        let reading = load(keys: Self.weeklyKeys, now: now)
+    func load(now: Date = Date()) -> QuotaUsageSnapshot? {
+        let weekly = load(keys: Self.weeklyKeys, now: now)
             ?? load(keys: Self.legacyWeeklyKeys, now: now)
+        let snapshot = QuotaUsageSnapshot(
+            fiveHour: load(keys: Self.fiveHourKeys, now: now),
+            weekly: weekly
+        )
 
-        if let reading {
-            saveCanonical(reading)
+        if let weekly {
+            save(weekly, keys: Self.weeklyKeys)
         }
-        clearObsoleteState()
-        return reading
+        clear(keys: Self.legacyWeeklyKeys)
+        defaults.removeObject(forKey: "usage.preferredQuotaWindow")
+        return snapshot.isEmpty ? nil : snapshot
     }
 
-    func save(_ reading: WeeklyQuotaReading) {
-        clear(keys: Self.weeklyKeys)
-        guard reading.resetsAt != nil else { return }
-        saveCanonical(reading)
+    func save(_ snapshot: QuotaUsageSnapshot) {
+        clear()
+        if let fiveHour = snapshot.fiveHour {
+            save(fiveHour, keys: Self.fiveHourKeys)
+        }
+        if let weekly = snapshot.weekly {
+            save(weekly, keys: Self.weeklyKeys)
+        }
     }
 
     func clear() {
+        clear(keys: Self.fiveHourKeys)
         clear(keys: Self.weeklyKeys)
-        clearObsoleteState()
-    }
-
-    private func clearObsoleteState() {
         clear(keys: Self.legacyWeeklyKeys)
-        Self.obsoleteKeys.forEach(defaults.removeObject(forKey:))
+        defaults.removeObject(forKey: "usage.preferredQuotaWindow")
     }
 
-    private func load(keys: Keys, now: Date) -> WeeklyQuotaReading? {
+    private func load(keys: Keys, now: Date) -> QuotaUsageReading? {
         guard
             defaults.object(forKey: keys.remainingPercent) != nil,
             let resetsAt = defaults.object(forKey: keys.resetsAt) as? Date,
@@ -74,18 +79,18 @@ final class UserDefaultsWeeklyQuotaCache: WeeklyQuotaCaching {
             return nil
         }
 
-        return WeeklyQuotaReading(
+        return QuotaUsageReading(
             remainingPercent: defaults.integer(forKey: keys.remainingPercent),
             resetsAt: resetsAt,
             fetchedAt: fetchedAt
         )
     }
 
-    private func saveCanonical(_ reading: WeeklyQuotaReading) {
+    private func save(_ reading: QuotaUsageReading, keys: Keys) {
         guard let resetsAt = reading.resetsAt else { return }
-        defaults.set(reading.remainingPercent, forKey: Self.weeklyKeys.remainingPercent)
-        defaults.set(resetsAt, forKey: Self.weeklyKeys.resetsAt)
-        defaults.set(reading.fetchedAt, forKey: Self.weeklyKeys.fetchedAt)
+        defaults.set(reading.remainingPercent, forKey: keys.remainingPercent)
+        defaults.set(resetsAt, forKey: keys.resetsAt)
+        defaults.set(reading.fetchedAt, forKey: keys.fetchedAt)
     }
 
     private func clear(keys: Keys) {
@@ -101,6 +106,7 @@ final class AppPreferences {
         static let codexVersion = "codex.version"
         static let obsoleteAppLanguage = "display.language"
         static let attemptedLoginRegistration = "launchAtLogin.registrationAttempted"
+        static let lastDailyCodexRequestAt = "dailyCodexRequest.lastAttemptAt"
     }
 
     private let defaults: UserDefaults
@@ -123,5 +129,10 @@ final class AppPreferences {
     var attemptedLoginRegistration: Bool {
         get { defaults.bool(forKey: Key.attemptedLoginRegistration) }
         set { defaults.set(newValue, forKey: Key.attemptedLoginRegistration) }
+    }
+
+    var lastDailyCodexRequestAt: Date? {
+        get { defaults.object(forKey: Key.lastDailyCodexRequestAt) as? Date }
+        set { defaults.set(newValue, forKey: Key.lastDailyCodexRequestAt) }
     }
 }
