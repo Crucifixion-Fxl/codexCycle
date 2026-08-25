@@ -1,16 +1,16 @@
 import AppKit
 
-enum WeeklyQuotaDisplayState: Equatable {
+enum QuotaDisplayState: Equatable {
     case unavailable(DisplayErrorReason?)
-    case stale(WeeklyQuotaReading, DisplayErrorReason?)
-    case fresh(WeeklyQuotaReading)
+    case stale(QuotaUsageSnapshot, DisplayErrorReason?)
+    case fresh(QuotaUsageSnapshot)
 
-    var reading: WeeklyQuotaReading? {
+    var snapshot: QuotaUsageSnapshot? {
         switch self {
         case .unavailable:
             return nil
-        case .stale(let reading, _), .fresh(let reading):
-            return reading
+        case .stale(let snapshot, _), .fresh(let snapshot):
+            return snapshot
         }
     }
 
@@ -41,8 +41,10 @@ struct StatusItemLayoutSnapshot {
 
 struct StatusMenuPresentationSnapshot {
     let indicatorRemainingPercent: Int?
+    let fiveHourTitle: String
+    let fiveHourResetTitle: String
     let weeklyTitle: String
-    let resetTitle: String
+    let weeklyResetTitle: String
     let updatedTitle: String
     let errorTitle: String?
 }
@@ -52,8 +54,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let indicatorView: StatusIndicatorView
     private let menu = NSMenu()
 
+    private let fiveHourItem = NSMenuItem()
+    private let fiveHourResetItem = NSMenuItem()
     private let weeklyItem = NSMenuItem()
-    private let resetItem = NSMenuItem()
+    private let weeklyResetItem = NSMenuItem()
     private let updatedItem = NSMenuItem()
     private let errorItem = NSMenuItem()
     private let refreshItem = NSMenuItem()
@@ -61,7 +65,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let openLoginSettingsItem = NSMenuItem()
     private let quitItem = NSMenuItem()
 
-    private var state: WeeklyQuotaDisplayState = .unavailable(nil)
+    private var state: QuotaDisplayState = .unavailable(nil)
     private var refreshing = false
     private var loginLaunchState: LoginLaunchState = .enabled
     private let localization: AppLocalization
@@ -80,8 +84,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var presentationSnapshot: StatusMenuPresentationSnapshot {
         StatusMenuPresentationSnapshot(
             indicatorRemainingPercent: indicatorView.remainingPercent,
+            fiveHourTitle: fiveHourItem.title,
+            fiveHourResetTitle: fiveHourResetItem.title,
             weeklyTitle: weeklyItem.title,
-            resetTitle: resetItem.title,
+            weeklyResetTitle: weeklyResetItem.title,
             updatedTitle: updatedItem.title,
             errorTitle: errorItem.isHidden ? nil : errorItem.title
         )
@@ -112,7 +118,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     }
 
     func update(
-        state: WeeklyQuotaDisplayState,
+        state: QuotaDisplayState,
         refreshing: Bool,
         loginLaunchState: LoginLaunchState,
         now: Date = Date()
@@ -121,7 +127,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         self.refreshing = refreshing
         self.loginLaunchState = loginLaunchState
 
-        indicatorView.remainingPercent = state.reading?.remainingPercent
+        indicatorView.remainingPercent = state.snapshot?.weekly?.remainingPercent
         indicatorView.isStale = state.isStale
         updateMenuText(now: now)
     }
@@ -162,7 +168,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
 
-        [weeklyItem, resetItem, updatedItem, errorItem].forEach {
+        [
+            fiveHourItem,
+            fiveHourResetItem,
+            weeklyItem,
+            weeklyResetItem,
+            updatedItem,
+            errorItem
+        ].forEach {
             $0.isEnabled = false
             menu.addItem($0)
         }
@@ -194,30 +207,39 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let staleSuffix = state.isStale
             ? localization.text("menu.stale_suffix")
             : ""
-        weeklyItem.title = weeklyQuotaTitle(
-            reading: state.reading,
+        let snapshot = state.snapshot
+
+        fiveHourItem.title = quotaTitle(
+            labelKey: "menu.five_hour_remaining",
+            reading: snapshot?.fiveHour,
             staleSuffix: staleSuffix
         )
+        fiveHourResetItem.title = resetTitle(
+            labelKey: "menu.five_hour_reset_countdown",
+            reading: snapshot?.fiveHour,
+            now: now
+        )
+        weeklyItem.title = quotaTitle(
+            labelKey: "menu.weekly_remaining",
+            reading: snapshot?.weekly,
+            staleSuffix: staleSuffix
+        )
+        weeklyResetItem.title = resetTitle(
+            labelKey: "menu.weekly_reset_countdown",
+            reading: snapshot?.weekly,
+            now: now
+        )
 
-        if let reading = state.reading {
-            resetItem.title = localization.format(
-                "menu.reset_countdown",
-                RelativeTimeText.countdown(
-                    to: reading.resetsAt,
-                    now: now,
-                    localization: localization
-                )
-            )
+        if let fetchedAt = snapshot?.latestFetchedAt {
             updatedItem.title = localization.format(
                 "menu.last_updated",
                 RelativeTimeText.since(
-                    reading.fetchedAt,
+                    fetchedAt,
                     now: now,
                     localization: localization
                 )
             )
         } else {
-            resetItem.title = localization.format("menu.reset_countdown", "—")
             updatedItem.title = localization.format("menu.last_updated", "—")
         }
 
@@ -246,14 +268,30 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         openLoginSettingsItem.isEnabled = loginDisabled
     }
 
-    private func weeklyQuotaTitle(
-        reading: WeeklyQuotaReading?,
+    private func quotaTitle(
+        labelKey: String,
+        reading: QuotaUsageReading?,
         staleSuffix: String
     ) -> String {
-        let label = localization.text("menu.weekly_remaining")
+        let label = localization.text(labelKey)
         guard let reading else {
             return "\(label)      —"
         }
         return "\(label)      \(reading.remainingPercent)%\(staleSuffix)"
+    }
+
+    private func resetTitle(
+        labelKey: String,
+        reading: QuotaUsageReading?,
+        now: Date
+    ) -> String {
+        localization.format(
+            labelKey,
+            RelativeTimeText.countdown(
+                to: reading?.resetsAt,
+                now: now,
+                localization: localization
+            )
+        )
     }
 }

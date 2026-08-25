@@ -10,35 +10,82 @@ enum RefreshTrigger {
     case serverEvent
     case resetBoundary
     case processRecovery
+    case dailyCodexRequest
+}
+
+struct DailyCodexRequestSchedule {
+    let calendar: Calendar
+    let hour: Int
+
+    init(calendar: Calendar = .autoupdatingCurrent, hour: Int = 7) {
+        self.calendar = calendar
+        self.hour = hour
+    }
+
+    func isDue(now: Date, lastAttemptAt: Date?) -> Bool {
+        guard let today = calendar.date(
+            bySettingHour: hour,
+            minute: 0,
+            second: 0,
+            of: now
+        ), now >= today else {
+            return false
+        }
+        guard let lastAttemptAt else { return true }
+        return !calendar.isDate(lastAttemptAt, inSameDayAs: now)
+    }
+
+    func nextFireDate(after now: Date) -> Date? {
+        guard let today = calendar.date(
+            bySettingHour: hour,
+            minute: 0,
+            second: 0,
+            of: now
+        ) else {
+            return nil
+        }
+        if now < today {
+            return today
+        }
+        return calendar.date(byAdding: .day, value: 1, to: today)
+    }
 }
 
 final class RefreshCoordinator {
     private let service: CodexUsageService
-    private let cache: WeeklyQuotaCaching
+    private let cache: QuotaUsageCaching
     private let menuController: StatusMenuController
     private let loginItemManager: LoginItemManager
+    private let preferences: AppPreferences
+    private let dailySchedule: DailyCodexRequestSchedule
     private let logger = Logger(subsystem: "com.fxl.codexCycle", category: "refresh")
 
-    private var state: WeeklyQuotaDisplayState = .unavailable(nil)
+    private var state: QuotaDisplayState = .unavailable(nil)
     private var refreshing = false
+    private var dailyRequestInFlight = false
     private var pollTimer: Timer?
     private var relativeTimer: Timer?
     private var expirationBoundaryTimer: Timer?
     private var reconnectTimer: Timer?
+    private var dailyRequestTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var reconnectAttempt = 0
     private let reconnectDelays: [TimeInterval] = [1, 5, 30, 300]
 
     init(
         service: CodexUsageService,
-        cache: WeeklyQuotaCaching,
+        cache: QuotaUsageCaching,
         menuController: StatusMenuController,
-        loginItemManager: LoginItemManager
+        loginItemManager: LoginItemManager,
+        preferences: AppPreferences,
+        dailySchedule: DailyCodexRequestSchedule = DailyCodexRequestSchedule()
     ) {
         self.service = service
         self.cache = cache
         self.menuController = menuController
         self.loginItemManager = loginItemManager
+        self.preferences = preferences
+        self.dailySchedule = dailySchedule
     }
 
     func start() {
@@ -70,14 +117,17 @@ final class RefreshCoordinator {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.invalidateExpiredReadingAndRefreshIfNeeded()
+            self?.invalidateExpiredReadingsAndRefreshIfNeeded()
             self?.requestRefresh(trigger: .wake)
+            self?.checkDailyCodexRequest()
         }
 
         schedulePollTimer()
         scheduleRelativeTimer()
+        scheduleDailyRequestTimer()
         updatePresentation()
         requestRefresh(trigger: .startup)
+        checkDailyCodexRequest()
     }
 
     func stop() {
@@ -86,6 +136,7 @@ final class RefreshCoordinator {
         relativeTimer?.invalidate()
         expirationBoundaryTimer?.invalidate()
         reconnectTimer?.invalidate()
+        dailyRequestTimer?.invalidate()
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
@@ -104,20 +155,20 @@ final class RefreshCoordinator {
             self.refreshing = false
 
             switch result {
-            case .success(let reading):
-                self.state = .fresh(reading)
-                self.cache.save(reading)
+            case .success(let snapshot):
+                self.state = .fresh(snapshot)
+                self.cache.save(snapshot)
                 self.reconnectAttempt = 0
                 self.reconnectTimer?.invalidate()
                 self.reconnectTimer = nil
                 self.schedulePollTimer()
             case .failure(let error):
                 let reason = DisplayErrorReason.classify(error)
-                if error is WeeklyQuotaError {
+                if error is QuotaUsageError {
                     self.cache.clear()
                     self.state = .unavailable(reason)
                 } else {
-                    self.retainValidReadingOrBecomeUnavailable(reason)
+                    self.retainValidSnapshotOrBecomeUnavailable(reason)
                 }
 
                 if case .processRecovery = trigger {
@@ -127,13 +178,14 @@ final class RefreshCoordinator {
 
             self.scheduleExpirationBoundaryTimer()
             self.updatePresentation()
+            self.checkDailyCodexRequest()
         }
     }
 
     private func schedulePollTimer() {
         pollTimer?.invalidate()
         let timer = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
-            self?.invalidateExpiredReadingAndRefreshIfNeeded()
+            self?.invalidateExpiredReadingsAndRefreshIfNeeded()
             self?.requestRefresh(trigger: .timer)
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -144,18 +196,61 @@ final class RefreshCoordinator {
         relativeTimer?.invalidate()
         let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
             guard let self else { return }
-            self.invalidateExpiredReadingAndRefreshIfNeeded()
+            self.invalidateExpiredReadingsAndRefreshIfNeeded()
             self.updatePresentation()
         }
         RunLoop.main.add(timer, forMode: .common)
         relativeTimer = timer
     }
 
+    private func scheduleDailyRequestTimer(now: Date = Date()) {
+        dailyRequestTimer?.invalidate()
+        dailyRequestTimer = nil
+        guard let fireDate = dailySchedule.nextFireDate(after: now) else { return }
+
+        let timer = Timer(fireAt: fireDate, interval: 0, target: self,
+                          selector: #selector(dailyRequestTimerFired),
+                          userInfo: nil, repeats: false)
+        RunLoop.main.add(timer, forMode: .common)
+        dailyRequestTimer = timer
+    }
+
+    @objc private func dailyRequestTimerFired() {
+        dailyRequestTimer = nil
+        checkDailyCodexRequest()
+    }
+
+    private func checkDailyCodexRequest(now: Date = Date()) {
+        scheduleDailyRequestTimer(now: now)
+        guard dailySchedule.isDue(
+            now: now,
+            lastAttemptAt: preferences.lastDailyCodexRequestAt
+        ) else { return }
+        guard !refreshing, !dailyRequestInFlight else { return }
+
+        dailyRequestInFlight = true
+        let started = service.startDailyCodexRequest { [weak self] result in
+            guard let self else { return }
+            self.dailyRequestInFlight = false
+            if case .failure = result {
+                self.logger.error("Daily Codex quota-refresh request failed")
+            }
+            self.requestRefresh(trigger: .dailyCodexRequest)
+        }
+
+        if started {
+            preferences.lastDailyCodexRequestAt = now
+            logger.info("Started daily Codex quota-refresh request")
+        } else {
+            dailyRequestInFlight = false
+        }
+    }
+
     private func scheduleExpirationBoundaryTimer() {
         expirationBoundaryTimer?.invalidate()
         expirationBoundaryTimer = nil
 
-        guard let resetsAt = state.reading?.resetsAt else {
+        guard let resetsAt = state.snapshot?.earliestResetAt else {
             return
         }
 
@@ -163,7 +258,7 @@ final class RefreshCoordinator {
         let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
             guard let self else { return }
             self.expirationBoundaryTimer = nil
-            self.invalidateExpiredReadingAndRefreshIfNeeded()
+            self.invalidateExpiredReadingsAndRefreshIfNeeded()
             if self.expirationBoundaryTimer == nil {
                 self.scheduleExpirationBoundaryTimer()
             }
@@ -172,12 +267,26 @@ final class RefreshCoordinator {
         expirationBoundaryTimer = timer
     }
 
-    private func invalidateExpiredReadingAndRefreshIfNeeded() {
+    private func invalidateExpiredReadingsAndRefreshIfNeeded() {
         let now = Date()
-        guard let reading = state.reading, !reading.isValid(at: now) else { return }
+        guard let snapshot = state.snapshot else { return }
+        let validSnapshot = snapshot.removingExpiredReadings(at: now)
+        guard validSnapshot != snapshot else { return }
 
         cache.clear()
-        state = .unavailable(nil)
+        if let validSnapshot {
+            cache.save(validSnapshot)
+            switch state {
+            case .fresh:
+                state = .fresh(validSnapshot)
+            case .stale(_, let reason):
+                state = .stale(validSnapshot, reason)
+            case .unavailable:
+                state = .stale(validSnapshot, nil)
+            }
+        } else {
+            state = .unavailable(nil)
+        }
 
         scheduleExpirationBoundaryTimer()
         updatePresentation()
@@ -186,16 +295,16 @@ final class RefreshCoordinator {
 
     private func handleUnexpectedProcessTermination(_ error: Error) {
         let reason = DisplayErrorReason.classify(error)
-        retainValidReadingOrBecomeUnavailable(reason)
+        retainValidSnapshotOrBecomeUnavailable(reason)
         scheduleExpirationBoundaryTimer()
         updatePresentation()
         scheduleReconnectAttempt()
     }
 
-    private func retainValidReadingOrBecomeUnavailable(_ reason: DisplayErrorReason) {
-        if let reading = state.reading, reading.isValid(at: Date()) {
-            state = .stale(reading, reason)
-            cache.save(reading)
+    private func retainValidSnapshotOrBecomeUnavailable(_ reason: DisplayErrorReason) {
+        if let snapshot = state.snapshot?.removingExpiredReadings(at: Date()) {
+            state = .stale(snapshot, reason)
+            cache.save(snapshot)
         } else {
             cache.clear()
             state = .unavailable(reason)
@@ -227,5 +336,4 @@ final class RefreshCoordinator {
             loginLaunchState: loginItemManager.state
         )
     }
-
 }

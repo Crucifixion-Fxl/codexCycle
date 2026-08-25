@@ -10,6 +10,26 @@ final class AppServerClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testDailyQuotaRefreshUsesEphemeralReadOnlyExec() {
+        let configuration = CodexExecLaunchConfiguration.dailyQuotaRefresh(
+            at: URL(fileURLWithPath: "/trusted/bin/codex"),
+            executableSearchPath: "/trusted/bin:/usr/bin:/bin"
+        )
+
+        XCTAssertEqual(configuration.executableURL.path, "/usr/bin/env")
+        XCTAssertEqual(configuration.arguments.first, "PATH=/trusted/bin:/usr/bin:/bin")
+        XCTAssertEqual(
+            Array(configuration.arguments[1...4]),
+            ["/trusted/bin/codex", "--ask-for-approval", "never", "exec"]
+        )
+        XCTAssertTrue(configuration.arguments.contains("--ephemeral"))
+        XCTAssertTrue(configuration.arguments.contains("--ignore-user-config"))
+        XCTAssertTrue(configuration.arguments.contains("read-only"))
+        XCTAssertTrue(configuration.arguments.contains("never"))
+        XCTAssertFalse(configuration.arguments.contains("workspace-write"))
+        XCTAssertFalse(configuration.arguments.contains("danger-full-access"))
+    }
+
     func testInitializesReadsQuotaLimitsAndEmitsUpdateNotification() throws {
         let script = try makeScript(
             body: """
