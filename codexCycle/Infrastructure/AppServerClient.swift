@@ -25,7 +25,7 @@ struct CodexExecLaunchConfiguration: Equatable {
     let executableURL: URL
     let arguments: [String]
 
-    static func dailyQuotaRefresh(
+    static func quotaRefresh(
         at executableURL: URL,
         executableSearchPath: String
     ) -> CodexExecLaunchConfiguration {

@@ -41,12 +41,18 @@ struct StatusItemLayoutSnapshot {
 
 struct StatusMenuPresentationSnapshot {
     let indicatorRemainingPercent: Int?
+    let language: AppLanguage
     let fiveHourTitle: String
     let fiveHourResetTitle: String
     let weeklyTitle: String
     let weeklyResetTitle: String
     let updatedTitle: String
     let errorTitle: String?
+    let requestTitle: String
+    let requestIsEnabled: Bool
+    let systemLanguageIsSelected: Bool
+    let englishLanguageIsSelected: Bool
+    let simplifiedChineseLanguageIsSelected: Bool
 }
 
 final class StatusMenuController: NSObject, NSMenuDelegate {
@@ -61,16 +67,26 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private let updatedItem = NSMenuItem()
     private let errorItem = NSMenuItem()
     private let refreshItem = NSMenuItem()
+    private let requestItem = NSMenuItem()
+    private let languageHeaderItem = NSMenuItem()
+    private let systemLanguageItem = NSMenuItem()
+    private let englishLanguageItem = NSMenuItem()
+    private let simplifiedChineseLanguageItem = NSMenuItem()
     private let loginDisabledItem = NSMenuItem()
     private let openLoginSettingsItem = NSMenuItem()
     private let quitItem = NSMenuItem()
 
     private var state: QuotaDisplayState = .unavailable(nil)
     private var refreshing = false
+    private var requesting = false
+    private var canRequest = false
     private var loginLaunchState: LoginLaunchState = .enabled
-    private let localization: AppLocalization
+    private var language: AppLanguage
+    private var localization: AppLocalization
 
     var onRefresh: (() -> Void)?
+    var onRequest: (() -> Void)?
+    var onSelectLanguage: ((AppLanguage) -> Void)?
     var onOpenLoginSettings: (() -> Void)?
 
     var layoutSnapshot: StatusItemLayoutSnapshot {
@@ -84,17 +100,25 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var presentationSnapshot: StatusMenuPresentationSnapshot {
         StatusMenuPresentationSnapshot(
             indicatorRemainingPercent: indicatorView.remainingPercent,
+            language: language,
             fiveHourTitle: fiveHourItem.title,
             fiveHourResetTitle: fiveHourResetItem.title,
             weeklyTitle: weeklyItem.title,
             weeklyResetTitle: weeklyResetItem.title,
             updatedTitle: updatedItem.title,
-            errorTitle: errorItem.isHidden ? nil : errorItem.title
+            errorTitle: errorItem.isHidden ? nil : errorItem.title,
+            requestTitle: requestItem.title,
+            requestIsEnabled: requestItem.isEnabled,
+            systemLanguageIsSelected: systemLanguageItem.state == .on,
+            englishLanguageIsSelected: englishLanguageItem.state == .on,
+            simplifiedChineseLanguageIsSelected:
+                simplifiedChineseLanguageItem.state == .on
         )
     }
 
-    init(localization: AppLocalization = AppLocalization()) {
-        self.localization = localization
+    init(language: AppLanguage = .system) {
+        self.language = language
+        localization = AppLocalization(language: language)
         statusItem = NSStatusBar.system.statusItem(
             withLength: StatusIndicatorMetrics.statusItemWidth
         )
@@ -113,6 +137,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         update(
             state: .unavailable(nil),
             refreshing: false,
+            requesting: false,
+            canRequest: false,
             loginLaunchState: .enabled
         )
     }
@@ -120,14 +146,18 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     func update(
         state: QuotaDisplayState,
         refreshing: Bool,
+        requesting: Bool = false,
+        canRequest: Bool = false,
         loginLaunchState: LoginLaunchState,
         now: Date = Date()
     ) {
         self.state = state
         self.refreshing = refreshing
+        self.requesting = requesting
+        self.canRequest = canRequest
         self.loginLaunchState = loginLaunchState
 
-        indicatorView.remainingPercent = state.snapshot?.weekly?.remainingPercent
+        indicatorView.remainingPercent = state.snapshot?.fiveHour?.remainingPercent
         indicatorView.isStale = state.isStale
         updateMenuText(now: now)
     }
@@ -136,8 +166,30 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         updateMenuText(now: Date())
     }
 
+    func setLanguage(_ language: AppLanguage, now: Date = Date()) {
+        self.language = language
+        localization = AppLocalization(language: language)
+        updateMenuText(now: now)
+    }
+
     @objc private func refreshSelected() {
         onRefresh?()
+    }
+
+    @objc private func requestSelected() {
+        onRequest?()
+    }
+
+    @objc private func systemLanguageSelected() {
+        onSelectLanguage?(.system)
+    }
+
+    @objc private func englishLanguageSelected() {
+        onSelectLanguage?(.english)
+    }
+
+    @objc private func simplifiedChineseLanguageSelected() {
+        onSelectLanguage?(.simplifiedChinese)
     }
 
     @objc private func openLoginSettingsSelected() {
@@ -185,6 +237,27 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         refreshItem.target = self
         refreshItem.action = #selector(refreshSelected)
         menu.addItem(refreshItem)
+
+        requestItem.target = self
+        requestItem.action = #selector(requestSelected)
+        menu.addItem(requestItem)
+
+        menu.addItem(.separator())
+
+        languageHeaderItem.isEnabled = false
+        menu.addItem(languageHeaderItem)
+
+        systemLanguageItem.target = self
+        systemLanguageItem.action = #selector(systemLanguageSelected)
+        menu.addItem(systemLanguageItem)
+
+        englishLanguageItem.target = self
+        englishLanguageItem.action = #selector(englishLanguageSelected)
+        menu.addItem(englishLanguageItem)
+
+        simplifiedChineseLanguageItem.target = self
+        simplifiedChineseLanguageItem.action = #selector(simplifiedChineseLanguageSelected)
+        menu.addItem(simplifiedChineseLanguageItem)
 
         loginDisabledItem.isEnabled = false
         loginDisabledItem.isHidden = true
@@ -256,7 +329,24 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         refreshItem.title = localization.text(
             refreshing ? "menu.refreshing" : "menu.refresh"
         )
-        refreshItem.isEnabled = !refreshing
+        refreshItem.isEnabled = !refreshing && !requesting
+
+        requestItem.title = localization.text(
+            requesting ? "menu.requesting" : "menu.request"
+        )
+        requestItem.isEnabled = canRequest && !refreshing && !requesting
+
+        languageHeaderItem.title = localization.text("menu.language_header")
+        systemLanguageItem.title = localization.text("menu.language_system")
+        englishLanguageItem.title = localization.text("menu.language_english")
+        simplifiedChineseLanguageItem.title = localization.text(
+            "menu.language_simplified_chinese"
+        )
+        systemLanguageItem.state = language == .system ? .on : .off
+        englishLanguageItem.state = language == .english ? .on : .off
+        simplifiedChineseLanguageItem.state = language == .simplifiedChinese
+            ? .on
+            : .off
 
         loginDisabledItem.title = localization.text("menu.login_disabled")
         openLoginSettingsItem.title = localization.text("menu.open_login_settings")

@@ -77,7 +77,7 @@ enum DisplayErrorReason: Equatable {
     }
 }
 
-enum DailyCodexRequestError: Error {
+enum CodexQuotaRefreshRequestError: Error {
     case runtimeUnavailable
     case launchFailed(String)
     case processExited(Int32)
@@ -93,8 +93,8 @@ final class CodexUsageService {
     private var activeCandidate: CodexCandidate?
     private var connecting = false
     private var queuedCompletions: [(Result<QuotaUsageSnapshot, Error>) -> Void] = []
-    private var dailyRequestProcess: Process?
-    private var dailyRequestTimeout: DispatchWorkItem?
+    private var quotaRefreshRequestProcess: Process?
+    private var quotaRefreshRequestTimeout: DispatchWorkItem?
 
     var onRateLimitsUpdated: (() -> Void)?
     var onUnexpectedTermination: ((Error) -> Void)?
@@ -131,18 +131,22 @@ final class CodexUsageService {
         }
     }
 
+    var canStartQuotaRefreshRequest: Bool {
+        activeCandidate != nil && quotaRefreshRequestProcess == nil
+    }
+
     @discardableResult
-    func startDailyCodexRequest(
+    func startQuotaRefreshRequest(
         timeout: TimeInterval = 90,
         completion: @escaping (Result<Void, Error>) -> Void
     ) -> Bool {
         dispatchPrecondition(condition: .onQueue(.main))
-        guard dailyRequestProcess == nil else { return false }
+        guard quotaRefreshRequestProcess == nil else { return false }
         guard let candidate = activeCandidate else {
             return false
         }
 
-        let configuration = CodexExecLaunchConfiguration.dailyQuotaRefresh(
+        let configuration = CodexExecLaunchConfiguration.quotaRefresh(
             at: candidate.executableURL,
             executableSearchPath: candidate.executableSearchPath
         )
@@ -155,15 +159,15 @@ final class CodexUsageService {
 
         process.terminationHandler = { [weak self, weak process] terminated in
             DispatchQueue.main.async {
-                guard let self, self.dailyRequestProcess === process else { return }
-                self.dailyRequestTimeout?.cancel()
-                self.dailyRequestTimeout = nil
-                self.dailyRequestProcess = nil
+                guard let self, self.quotaRefreshRequestProcess === process else { return }
+                self.quotaRefreshRequestTimeout?.cancel()
+                self.quotaRefreshRequestTimeout = nil
+                self.quotaRefreshRequestProcess = nil
                 if terminated.terminationStatus == 0 {
                     completion(.success(()))
                 } else {
                     completion(.failure(
-                        DailyCodexRequestError.processExited(terminated.terminationStatus)
+                        CodexQuotaRefreshRequestError.processExited(terminated.terminationStatus)
                     ))
                 }
             }
@@ -172,33 +176,33 @@ final class CodexUsageService {
         do {
             try process.run()
         } catch {
-            logger.error("Failed to launch daily Codex quota-refresh request")
+            logger.error("Failed to launch Codex quota-refresh request")
             return false
         }
 
-        dailyRequestProcess = process
+        quotaRefreshRequestProcess = process
         let timeoutWork = DispatchWorkItem { [weak self, weak process] in
-            guard let self, self.dailyRequestProcess === process else { return }
-            self.dailyRequestProcess = nil
-            self.dailyRequestTimeout = nil
+            guard let self, self.quotaRefreshRequestProcess === process else { return }
+            self.quotaRefreshRequestProcess = nil
+            self.quotaRefreshRequestTimeout = nil
             if process?.isRunning == true {
                 process?.terminate()
             }
-            completion(.failure(DailyCodexRequestError.timedOut))
+            completion(.failure(CodexQuotaRefreshRequestError.timedOut))
         }
-        dailyRequestTimeout = timeoutWork
+        quotaRefreshRequestTimeout = timeoutWork
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
         return true
     }
 
     func stop() {
         dispatchPrecondition(condition: .onQueue(.main))
-        dailyRequestTimeout?.cancel()
-        dailyRequestTimeout = nil
-        if dailyRequestProcess?.isRunning == true {
-            dailyRequestProcess?.terminate()
+        quotaRefreshRequestTimeout?.cancel()
+        quotaRefreshRequestTimeout = nil
+        if quotaRefreshRequestProcess?.isRunning == true {
+            quotaRefreshRequestProcess?.terminate()
         }
-        dailyRequestProcess = nil
+        quotaRefreshRequestProcess = nil
         client?.stop()
         client = nil
         activeCandidate = nil

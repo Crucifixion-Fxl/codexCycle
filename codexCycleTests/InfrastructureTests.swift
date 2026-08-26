@@ -659,9 +659,7 @@ final class InfrastructureTests: XCTestCase {
     @MainActor
     func testMenuShowsFiveHourAndWeeklyQuotaInSupportedSystemLanguages() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let englishController = StatusMenuController(
-            localization: try localization(for: "en")
-        )
+        let englishController = StatusMenuController(language: .english)
         englishController.update(
             state: .fresh(
                 QuotaUsageSnapshot(
@@ -678,21 +676,27 @@ final class InfrastructureTests: XCTestCase {
                 )
             ),
             refreshing: false,
+            canRequest: true,
             loginLaunchState: .enabled,
             now: now
         )
 
         let presentation = englishController.presentationSnapshot
 
-        XCTAssertEqual(presentation.indicatorRemainingPercent, 42)
+        XCTAssertEqual(presentation.indicatorRemainingPercent, 75)
         XCTAssertEqual(presentation.fiveHourTitle, "5-hour remaining      75%")
         XCTAssertEqual(presentation.fiveHourResetTitle, "5-hour resets in  1 hour")
         XCTAssertEqual(presentation.weeklyTitle, "Weekly remaining      42%")
         XCTAssertEqual(presentation.weeklyResetTitle, "Weekly resets in  1 day")
+        XCTAssertEqual(presentation.requestTitle, "Request Now")
+        XCTAssertTrue(presentation.requestIsEnabled)
+        XCTAssertTrue(presentation.englishLanguageIsSelected)
 
-        let chineseController = StatusMenuController(
-            localization: try localization(for: "zh-Hans")
-        )
+        englishController.setLanguage(.simplifiedChinese, now: now)
+        XCTAssertEqual(englishController.presentationSnapshot.language, .simplifiedChinese)
+        XCTAssertEqual(englishController.presentationSnapshot.requestTitle, "立即请求")
+
+        let chineseController = StatusMenuController(language: .simplifiedChinese)
         chineseController.update(
             state: .fresh(
                 QuotaUsageSnapshot(
@@ -717,13 +721,26 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(chineseController.presentationSnapshot.fiveHourResetTitle, "5 小时重置    1 小时")
         XCTAssertEqual(chineseController.presentationSnapshot.weeklyTitle, "周余量      42%")
         XCTAssertEqual(chineseController.presentationSnapshot.weeklyResetTitle, "周重置倒计时  1 天")
+        XCTAssertEqual(chineseController.presentationSnapshot.requestTitle, "立即请求")
+        XCTAssertTrue(
+            chineseController.presentationSnapshot.simplifiedChineseLanguageIsSelected
+        )
+    }
+
+    @MainActor
+    func testMenuDefaultsToFollowSystemAndDisablesRequestWithoutRuntime() {
+        let controller = StatusMenuController()
+
+        let presentation = controller.presentationSnapshot
+
+        XCTAssertEqual(presentation.language, .system)
+        XCTAssertTrue(presentation.systemLanguageIsSelected)
+        XCTAssertFalse(presentation.requestIsEnabled)
     }
 
     @MainActor
     func testMenuKeepsBothRowsWhenQuotaIsUnavailable() throws {
-        let controller = StatusMenuController(
-            localization: try localization(for: "en")
-        )
+        let controller = StatusMenuController(language: .english)
         controller.update(
             state: .unavailable(.supportedLimitsMissing),
             refreshing: false,

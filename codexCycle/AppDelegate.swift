@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let locator = CodexLocator(preferences: preferences)
         let service = CodexUsageService(locator: locator, preferences: preferences)
-        let menuController = StatusMenuController()
+        let menuController = StatusMenuController(language: preferences.appLanguage)
         let coordinator = RefreshCoordinator(
             service: service,
             cache: UserDefaultsQuotaUsageCache(),
@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func runDiagnostic(preferences: AppPreferences) {
         let locator = CodexLocator(preferences: preferences)
         let service = CodexUsageService(locator: locator, preferences: preferences)
-        let localization = AppLocalization()
+        let localization = AppLocalization(language: preferences.appLanguage)
         diagnosticService = service
 
         service.fetch { [weak self] result in
