@@ -12,14 +12,14 @@ automatically and uses your existing local Codex authentication.
 
 ## What it shows
 
-- The number in the menu bar is the weekly remaining percentage. The center
+- The number in the menu bar is the five-hour remaining percentage. The center
   omits the `%` sign to stay readable at menu-bar size.
 - The remaining arc follows a fixed red → yellow → green scale: red at `0`,
   yellow at `20`, and green from `50` through `100`.
 - Clicking the indicator opens the five-hour and weekly readings, their reset
-  countdowns, the last update time, and manual refresh.
-- The interface follows the language selected by macOS. English and Simplified
-  Chinese are supported; there is no separate in-app language setting.
+  countdowns, the last update time, Refresh Now, and Request Now.
+- The interface follows the language selected by macOS by default. The menu can
+  switch explicitly between Follow System, English, and Simplified Chinese.
 
 ## Display logic
 
@@ -34,6 +34,8 @@ automatically and uses your existing local Codex authentication.
 - At 7:00 AM local time each day, the app makes one minimal, ephemeral, read-only
   Codex request to start or roll the five-hour window, then reads the quotas
   again. A sleeping or closed Mac catches up once after the next wake or launch.
+- **Request Now** runs the same safe request on demand and refreshes the quota
+  readings when it completes.
 
 ## Requirements
 
@@ -73,11 +75,12 @@ make purge      # Remove the app and its preferences
 ## Data and privacy
 
 `codexCycle` reads `account/rateLimits/read` from a local
-`codex app-server --stdio` process. The daily request runs through the validated
-local Runtime as an ephemeral `codex exec` session with a read-only sandbox,
-tools disabled by instruction, and user configuration ignored. The app does not
-read or store credentials, make direct network requests, collect analytics, or
-send telemetry. Runtime executables are validated before launch.
+`codex app-server --stdio` process. Daily and manually requested quota-refresh
+turns run through the validated local Runtime as ephemeral `codex exec` sessions
+with a read-only sandbox, tools disabled by instruction, and user configuration
+ignored. The app does not read or store credentials, make direct network
+requests, collect analytics, or send telemetry. Runtime executables are
+validated before launch.
 
 For implementation details, see the [product specification](docs/product-spec.md)
 and the [runtime](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md)

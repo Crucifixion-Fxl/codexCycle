@@ -120,15 +120,18 @@ final class QuotaUsageCacheTests: XCTestCase {
 }
 
 final class AppPreferencesTests: XCTestCase {
-    func testRemovesObsoleteExplicitLanguageSelection() throws {
+    func testDefaultsToSystemLanguageAndPersistsExplicitSelection() throws {
         let suiteName = "AppPreferencesTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.set("zh-Hans", forKey: "display.language")
 
-        _ = AppPreferences(defaults: defaults)
+        let preferences = AppPreferences(defaults: defaults)
+        XCTAssertEqual(preferences.appLanguage, .system)
 
-        XCTAssertNil(defaults.object(forKey: "display.language"))
+        preferences.appLanguage = .simplifiedChinese
+
+        XCTAssertEqual(AppPreferences(defaults: defaults).appLanguage, .simplifiedChinese)
+        XCTAssertEqual(defaults.string(forKey: "display.language"), "zh-Hans")
     }
 
     func testPersistsLastDailyCodexRequestDate() throws {

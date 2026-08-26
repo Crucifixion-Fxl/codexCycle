@@ -10,8 +10,8 @@ final class AppServerClientTests: XCTestCase {
         super.tearDown()
     }
 
-    func testDailyQuotaRefreshUsesEphemeralReadOnlyExec() {
-        let configuration = CodexExecLaunchConfiguration.dailyQuotaRefresh(
+    func testQuotaRefreshRequestUsesEphemeralReadOnlyExec() {
+        let configuration = CodexExecLaunchConfiguration.quotaRefresh(
             at: URL(fileURLWithPath: "/trusted/bin/codex"),
             executableSearchPath: "/trusted/bin:/usr/bin:/bin"
         )

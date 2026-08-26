@@ -7,6 +7,12 @@
 "menu.stale_suffix" = " (stale)";
 "menu.refresh" = "Refresh Now";
 "menu.refreshing" = "Refreshing…";
+"menu.request" = "Request Now";
+"menu.requesting" = "Requesting…";
+"menu.language_header" = "Language";
+"menu.language_system" = "Follow System";
+"menu.language_english" = "English";
+"menu.language_simplified_chinese" = "简体中文";
 "menu.login_disabled" = "Launch at Login Disabled";
 "menu.open_login_settings" = "Open Login Items Settings…";
 "menu.quit" = "Quit codexCycle";

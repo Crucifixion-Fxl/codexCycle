@@ -11,6 +11,7 @@ enum RefreshTrigger {
     case resetBoundary
     case processRecovery
     case dailyCodexRequest
+    case manualCodexRequest
 }
 
 struct DailyCodexRequestSchedule {
@@ -62,7 +63,7 @@ final class RefreshCoordinator {
 
     private var state: QuotaDisplayState = .unavailable(nil)
     private var refreshing = false
-    private var dailyRequestInFlight = false
+    private var quotaRefreshRequestInFlight = false
     private var pollTimer: Timer?
     private var relativeTimer: Timer?
     private var expirationBoundaryTimer: Timer?
@@ -107,6 +108,14 @@ final class RefreshCoordinator {
 
         menuController.onRefresh = { [weak self] in
             self?.requestRefresh(trigger: .manual)
+        }
+        menuController.onRequest = { [weak self] in
+            self?.startManualCodexRequest()
+        }
+        menuController.onSelectLanguage = { [weak self] language in
+            guard let self else { return }
+            self.preferences.appLanguage = language
+            self.menuController.setLanguage(language)
         }
         menuController.onOpenLoginSettings = { [weak self] in
             self?.loginItemManager.openSystemSettings()
@@ -226,12 +235,13 @@ final class RefreshCoordinator {
             now: now,
             lastAttemptAt: preferences.lastDailyCodexRequestAt
         ) else { return }
-        guard !refreshing, !dailyRequestInFlight else { return }
+        guard !refreshing, !quotaRefreshRequestInFlight else { return }
 
-        dailyRequestInFlight = true
-        let started = service.startDailyCodexRequest { [weak self] result in
+        quotaRefreshRequestInFlight = true
+        updatePresentation()
+        let started = service.startQuotaRefreshRequest { [weak self] result in
             guard let self else { return }
-            self.dailyRequestInFlight = false
+            self.quotaRefreshRequestInFlight = false
             if case .failure = result {
                 self.logger.error("Daily Codex quota-refresh request failed")
             }
@@ -242,8 +252,38 @@ final class RefreshCoordinator {
             preferences.lastDailyCodexRequestAt = now
             logger.info("Started daily Codex quota-refresh request")
         } else {
-            dailyRequestInFlight = false
+            quotaRefreshRequestInFlight = false
+            updatePresentation()
         }
+    }
+
+    private func startManualCodexRequest(now: Date = Date()) {
+        guard !refreshing, !quotaRefreshRequestInFlight else { return }
+
+        quotaRefreshRequestInFlight = true
+        updatePresentation()
+        let started = service.startQuotaRefreshRequest { [weak self] result in
+            guard let self else { return }
+            self.quotaRefreshRequestInFlight = false
+            if case .failure = result {
+                self.logger.error("Manual Codex quota-refresh request failed")
+            }
+            self.requestRefresh(trigger: .manualCodexRequest)
+        }
+
+        guard started else {
+            quotaRefreshRequestInFlight = false
+            updatePresentation()
+            return
+        }
+
+        if dailySchedule.isDue(
+            now: now,
+            lastAttemptAt: preferences.lastDailyCodexRequestAt
+        ) {
+            preferences.lastDailyCodexRequestAt = now
+        }
+        logger.info("Started manual Codex quota-refresh request")
     }
 
     private func scheduleExpirationBoundaryTimer() {
@@ -333,6 +373,8 @@ final class RefreshCoordinator {
         menuController.update(
             state: state,
             refreshing: refreshing,
+            requesting: quotaRefreshRequestInFlight,
+            canRequest: service.canStartQuotaRefreshRequest,
             loginLaunchState: loginItemManager.state
         )
     }
