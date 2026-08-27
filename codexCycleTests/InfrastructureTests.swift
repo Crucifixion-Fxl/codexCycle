@@ -742,7 +742,7 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
-    func testTruncatedQuotaTextExpandsOnHover() {
+    func testPlusWeeklyTextShowsCompleteVisibleExpansionOnHover() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let controller = StatusMenuController(language: .english)
         controller.update(
@@ -767,7 +767,17 @@ final class InfrastructureTests: XCTestCase {
         )
 
         XCTAssertTrue(controller.hasTruncatedDynamicText)
-        XCTAssertTrue(controller.expansionTooltipsAreCorrect)
+        controller.simulateQuotaSummaryHoverForTesting()
+
+        XCTAssertTrue(controller.hoverExpansionSnapshot.isVisible)
+        XCTAssertEqual(
+            controller.hoverExpansionSnapshot.text,
+            "Weekly remaining 42%   ·   resets in 6 days 23 hours"
+        )
+
+        controller.simulateQuotaSummaryExitForTesting()
+        XCTAssertFalse(controller.hoverExpansionSnapshot.isVisible)
+        XCTAssertNil(controller.hoverExpansionSnapshot.text)
     }
 
     @MainActor
