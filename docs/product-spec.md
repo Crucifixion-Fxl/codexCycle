@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentages in the main Codex five-hour and weekly quota windows. The status indicator defaults to the five-hour quota; the detail menu shows both windows. It has no Dock icon, main window, quota selector, notifications, telemetry, updater, or login flow.
+`codexCycle` is a personal, menu-bar-only macOS app that shows the remaining percentages in the main Codex five-hour and weekly quota windows. The status indicator and detail panel use five-hour quota when that window exists, otherwise they use weekly quota. The detail panel also shows the other window. It has no Dock icon, main window, quota selector, notifications, telemetry, updater, or login flow.
 
 The interface follows the language selected by macOS by default. English and Simplified Chinese are supported, with English as the fallback for other system languages. The user may override the interface language with English or Simplified Chinese and return to following the system at any time.
 
@@ -73,44 +73,66 @@ The interface follows the language selected by macOS by default. English and Sim
 
 ## Menu
 
-The app has no main window. Clicking the indicator opens the detail menu in the interface language selected by macOS. In English, the menu appears:
+The app has no main window. Clicking the indicator toggles a compact 300 × 414 pt
+floating `NSPanel` in the selected interface language. The panel uses a dark,
+low-saturation glass surface with independent shadow and four equal-width stacked
+components: usage, actions, language, and settings. It avoids stacking a separate
+card around every row.
+If the five-hour window is present, the panel treats the account as Plus and
+uses that window for the gauge and all of its quota copy. If it is absent, the
+panel treats the account as Pro and uses the weekly window instead. The panel
+does not make a separate account request or infer the plan from any other field.
+
+The visual hierarchy is:
 
 ```text
-5-hour remaining      75%
-5-hour resets in      3 hours 18 minutes
-Weekly remaining      42%
-Weekly resets in      2 days 3 hours
-Last updated          3 minutes ago
-────────────
-Refresh Now
-Request Now
-────────────
-Language
-Follow System          ✓
-English
-简体中文
-────────────
-Quit codexCycle
+╭──────────────────────────────────────────╮
+│  ╭────────╮   Selected quota             │
+│  │  75%   │   Resets in 3 hours          │
+│  ╰────────╯                               │
+│  Other quota 42% · resets in 2 days      │
+│  Updated 3 minutes ago                    │
+╰──────────────────────────────────────────╯
+╭────────── ↻ Refresh ──┬── Request ───────╮
+╰───────────────────────┴──────────────────╯
+       [ System ]       EN        简中
+╭──────────────────────────────────────────╮
+│  Launch at Login Disabled                │
+│  Login Items Settings…                   │
+╰──────────────────────────────────────────╯
+Quit codexCycle                            ⌘ Q
 ```
 
-When both windows are unavailable, the menu retains the same shape:
+The usage component begins 7 pt below the shared 12 pt component inset baseline.
+If the selected plan window is unavailable, its value shows `—`.
 
-```text
-5-hour remaining    —
-5-hour resets in    —
-Weekly remaining    —
-Weekly resets in    —
-Last updated        —
-Reason              5-hour and weekly quotas unavailable
-```
-
-- Both quota rows are read-only, include `%` when available, and show `—` otherwise. The center indicator continues to show the five-hour reading and omits `%`.
-- Each reset countdown corresponds to its own window. Status-indicator colors always correspond to the five-hour reading.
-- The reset countdown uses at most two units and no seconds: `2 days 3 hours`, `4 hours 18 minutes`, or `less than 1 minute` in English, with equivalent Simplified Chinese text.
+- The menu's circular gauge, adjacent title, and reset countdown present the
+  selected plan window. The compact line below always presents the other window:
+  weekly below a five-hour gauge, or five-hour below a weekly gauge. A missing
+  secondary reading remains visible as `—`. The status-bar indicator follows the
+  same primary-window rule as the panel and omits `%`.
+- Each reset countdown corresponds to its own window and uses at most two units
+  with no seconds.
+- Status-indicator colors always correspond to its selected primary reading.
 - The menu recalculates relative times at least once per minute while the app runs.
-- Errors add one short localized reason when both supported windows are unavailable or the request fails: Codex Runtime not found, incompatible Codex Runtime, not logged in, supported quotas unavailable, network failure, or Codex service unavailable.
+- Errors add one short localized reason when supported quotas are unavailable or
+  the request fails.
 - The menu and read-only diagnostics use Follow System, English, or Simplified Chinese localization. Follow System is the default; an explicit override is stored in `display.language` and takes effect immediately.
-- If login launch is disabled, show that state and provide a localized action that opens Login Items Settings.
+- Always show the current launch-at-login state and provide a localized action
+  that opens Login Items Settings.
+- Refresh, request, and language-selection actions update the open panel in place;
+  they do not dismiss it.
+- A Codex request progresses through localized requesting, success, or failure
+  feedback on the request button. Success uses a restrained green check, failure
+  uses a muted red warning, and either result returns to the idle action after
+  two seconds. The subsequent quota refresh does not overwrite this result.
+- The language selector's selected background slides between segments over 240 ms
+  with a restrained ease-out curve. It switches immediately when Reduce Motion is
+  enabled.
+- The panel is borderless and non-activating, and remains visible while its
+  controls are used. It closes when the status item is toggled again, when a
+  mouse-down occurs outside both the panel and the status item, or when the app
+  exits. Refresh, request, and language actions do not dismiss it.
 - The localized `Quit codexCycle` action stops the current process but leaves launch-at-login registered.
 
 ## Cached state and failure behavior

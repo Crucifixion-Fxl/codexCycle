@@ -684,6 +684,13 @@ final class InfrastructureTests: XCTestCase {
         let presentation = englishController.presentationSnapshot
 
         XCTAssertEqual(presentation.indicatorRemainingPercent, 75)
+        XCTAssertEqual(presentation.panelRemainingPercent, 75)
+        XCTAssertEqual(presentation.panelQuotaTitle, "5-hour remaining")
+        XCTAssertEqual(presentation.panelResetTitle, "Resets in 1 hour")
+        XCTAssertEqual(
+            presentation.panelSummaryTitle,
+            "Weekly remaining 42%   ·   resets in 1 day"
+        )
         XCTAssertEqual(presentation.fiveHourTitle, "5-hour remaining      75%")
         XCTAssertEqual(presentation.fiveHourResetTitle, "5-hour resets in  1 hour")
         XCTAssertEqual(presentation.weeklyTitle, "Weekly remaining      42%")
@@ -721,6 +728,13 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(chineseController.presentationSnapshot.fiveHourResetTitle, "5 小时重置    1 小时")
         XCTAssertEqual(chineseController.presentationSnapshot.weeklyTitle, "周余量      42%")
         XCTAssertEqual(chineseController.presentationSnapshot.weeklyResetTitle, "周重置倒计时  1 天")
+        XCTAssertEqual(chineseController.presentationSnapshot.panelRemainingPercent, 75)
+        XCTAssertEqual(chineseController.presentationSnapshot.panelQuotaTitle, "5 小时余量")
+        XCTAssertEqual(chineseController.presentationSnapshot.panelResetTitle, "1 小时后重置")
+        XCTAssertEqual(
+            chineseController.presentationSnapshot.panelSummaryTitle,
+            "周余量 42%   ·   周重置 1 天"
+        )
         XCTAssertEqual(chineseController.presentationSnapshot.requestTitle, "立即请求")
         XCTAssertTrue(
             chineseController.presentationSnapshot.simplifiedChineseLanguageIsSelected
@@ -739,6 +753,73 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
+    func testRequestButtonShowsRequestLifecycleFeedback() {
+        let controller = StatusMenuController(language: .english)
+
+        controller.update(
+            state: .unavailable(nil),
+            refreshing: false,
+            requestFeedback: .requesting,
+            canRequest: true,
+            loginLaunchState: .enabled
+        )
+        XCTAssertEqual(controller.presentationSnapshot.requestTitle, "Requesting…")
+        XCTAssertFalse(controller.presentationSnapshot.requestIsEnabled)
+
+        controller.update(
+            state: .unavailable(nil),
+            refreshing: false,
+            requestFeedback: .succeeded,
+            canRequest: true,
+            loginLaunchState: .enabled
+        )
+        XCTAssertEqual(controller.presentationSnapshot.requestTitle, "Request Succeeded")
+        XCTAssertFalse(controller.presentationSnapshot.requestIsEnabled)
+
+        controller.setLanguage(.simplifiedChinese)
+        controller.update(
+            state: .unavailable(nil),
+            refreshing: false,
+            requestFeedback: .failed,
+            canRequest: true,
+            loginLaunchState: .enabled
+        )
+        XCTAssertEqual(controller.presentationSnapshot.requestTitle, "请求失败")
+        XCTAssertFalse(controller.presentationSnapshot.requestIsEnabled)
+
+        controller.update(
+            state: .unavailable(nil),
+            refreshing: false,
+            requestFeedback: .idle,
+            canRequest: true,
+            loginLaunchState: .enabled
+        )
+        XCTAssertEqual(controller.presentationSnapshot.requestTitle, "立即请求")
+        XCTAssertTrue(controller.presentationSnapshot.requestIsEnabled)
+    }
+
+    @MainActor
+    func testLanguageSelectionSliderMovesToSelectedSegmentAndRespectsReduceMotion() {
+        let control = LanguageSegmentedControl(labels: ["System", "EN", "简中"])
+        control.frame = NSRect(x: 0, y: 0, width: 276, height: 32)
+
+        control.setSelectedSegment(2, animated: true, reduceMotion: true)
+        XCTAssertEqual(control.selectedSegment, 2)
+        XCTAssertEqual(control.selectionPosition, 2)
+
+        control.setSelectedSegment(0, animated: true, reduceMotion: false)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+
+        XCTAssertGreaterThan(control.selectionPosition, 0.01)
+        XCTAssertLessThan(control.selectionPosition, 1.99)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.27))
+
+        XCTAssertEqual(control.selectedSegment, 0)
+        XCTAssertEqual(control.selectionPosition, 0, accuracy: 0.01)
+    }
+
+    @MainActor
     func testMenuKeepsBothRowsWhenQuotaIsUnavailable() throws {
         let controller = StatusMenuController(language: .english)
         controller.update(
@@ -752,6 +833,84 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(
             controller.presentationSnapshot.errorTitle,
             "Reason           5-hour and weekly quotas unavailable"
+        )
+    }
+
+    @MainActor
+    func testCompactPanelMatchesReferenceLayout() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let controller = StatusMenuController(language: .simplifiedChinese)
+        controller.update(
+            state: .fresh(
+                QuotaUsageSnapshot(
+                    fiveHour: nil,
+                    weekly: QuotaUsageReading(
+                        remainingPercent: 88,
+                        resetsAt: now.addingTimeInterval(5 * 86_400 + 8 * 3_600),
+                        fetchedAt: now
+                    )
+                )
+            ),
+            refreshing: false,
+            canRequest: true,
+            loginLaunchState: .disabled,
+            now: now
+        )
+
+        XCTAssertEqual(controller.presentationSnapshot.panelRemainingPercent, 88)
+        XCTAssertEqual(controller.presentationSnapshot.indicatorRemainingPercent, 88)
+        XCTAssertEqual(controller.presentationSnapshot.panelQuotaTitle, "周余量")
+        XCTAssertEqual(controller.presentationSnapshot.panelResetTitle, "5 天 8 小时后重置")
+        XCTAssertEqual(
+            controller.presentationSnapshot.panelSummaryTitle,
+            "5 小时余量 —   ·   5 小时重置 —"
+        )
+
+        let image = try XCTUnwrap(controller.renderedMenuImage())
+        let data = try XCTUnwrap(image.tiffRepresentation)
+        let representation = try XCTUnwrap(NSBitmapImageRep(data: data))
+        let pngData = try XCTUnwrap(
+            representation.representation(using: .png, properties: [:])
+        )
+
+        XCTAssertEqual(image.size, NSSize(width: 300, height: 414))
+        let attachment = XCTAttachment(
+            data: pngData,
+            uniformTypeIdentifier: "public.png"
+        )
+        attachment.name = "Compact usage panel"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    func testUsageSurfaceIsPersistentFloatingPanel() {
+        let controller = StatusMenuController(language: .simplifiedChinese)
+        let panel = controller.panelLayoutSnapshot
+
+        XCTAssertEqual(panel.contentSize, NSSize(width: 300, height: 414))
+        XCTAssertTrue(panel.styleMask.contains(.borderless))
+        XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
+        XCTAssertEqual(panel.level, .popUpMenu)
+        XCTAssertTrue(panel.isFloatingPanel)
+        XCTAssertFalse(panel.hidesOnDeactivate)
+    }
+
+    @MainActor
+    func testStatusItemToggleSurvivesActivationTransition() {
+        let controller = StatusMenuController(language: .simplifiedChinese)
+
+        controller.perform(NSSelectorFromString("togglePanel"))
+        XCTAssertTrue(controller.panelLayoutSnapshot.isVisible)
+
+        NotificationCenter.default.post(
+            name: NSApplication.didResignActiveNotification,
+            object: NSApp
+        )
+
+        XCTAssertTrue(
+            controller.panelLayoutSnapshot.isVisible,
+            "Opening from the status item must not immediately dismiss the panel"
         )
     }
 

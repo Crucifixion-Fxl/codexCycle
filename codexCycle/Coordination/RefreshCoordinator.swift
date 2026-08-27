@@ -64,11 +64,13 @@ final class RefreshCoordinator {
     private var state: QuotaDisplayState = .unavailable(nil)
     private var refreshing = false
     private var quotaRefreshRequestInFlight = false
+    private var requestFeedback: RequestFeedbackState = .idle
     private var pollTimer: Timer?
     private var relativeTimer: Timer?
     private var expirationBoundaryTimer: Timer?
     private var reconnectTimer: Timer?
     private var dailyRequestTimer: Timer?
+    private var requestFeedbackTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var reconnectAttempt = 0
     private let reconnectDelays: [TimeInterval] = [1, 5, 30, 300]
@@ -146,6 +148,7 @@ final class RefreshCoordinator {
         expirationBoundaryTimer?.invalidate()
         reconnectTimer?.invalidate()
         dailyRequestTimer?.invalidate()
+        requestFeedbackTimer?.invalidate()
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
@@ -237,11 +240,13 @@ final class RefreshCoordinator {
         ) else { return }
         guard !refreshing, !quotaRefreshRequestInFlight else { return }
 
+        beginRequestFeedback()
         quotaRefreshRequestInFlight = true
         updatePresentation()
         let started = service.startQuotaRefreshRequest { [weak self] result in
             guard let self else { return }
             self.quotaRefreshRequestInFlight = false
+            self.completeRequestFeedback(result)
             if case .failure = result {
                 self.logger.error("Daily Codex quota-refresh request failed")
             }
@@ -253,18 +258,22 @@ final class RefreshCoordinator {
             logger.info("Started daily Codex quota-refresh request")
         } else {
             quotaRefreshRequestInFlight = false
-            updatePresentation()
+            completeRequestFeedback(.failure(
+                CodexQuotaRefreshRequestError.runtimeUnavailable
+            ))
         }
     }
 
     private func startManualCodexRequest(now: Date = Date()) {
         guard !refreshing, !quotaRefreshRequestInFlight else { return }
 
+        beginRequestFeedback()
         quotaRefreshRequestInFlight = true
         updatePresentation()
         let started = service.startQuotaRefreshRequest { [weak self] result in
             guard let self else { return }
             self.quotaRefreshRequestInFlight = false
+            self.completeRequestFeedback(result)
             if case .failure = result {
                 self.logger.error("Manual Codex quota-refresh request failed")
             }
@@ -273,7 +282,9 @@ final class RefreshCoordinator {
 
         guard started else {
             quotaRefreshRequestInFlight = false
-            updatePresentation()
+            completeRequestFeedback(.failure(
+                CodexQuotaRefreshRequestError.runtimeUnavailable
+            ))
             return
         }
 
@@ -284,6 +295,32 @@ final class RefreshCoordinator {
             preferences.lastDailyCodexRequestAt = now
         }
         logger.info("Started manual Codex quota-refresh request")
+    }
+
+    private func beginRequestFeedback() {
+        requestFeedbackTimer?.invalidate()
+        requestFeedbackTimer = nil
+        requestFeedback = .requesting
+    }
+
+    private func completeRequestFeedback(_ result: Result<Void, Error>) {
+        switch result {
+        case .success:
+            requestFeedback = .succeeded
+        case .failure:
+            requestFeedback = .failed
+        }
+        updatePresentation()
+
+        requestFeedbackTimer?.invalidate()
+        let timer = Timer(timeInterval: 2, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.requestFeedbackTimer = nil
+            self.requestFeedback = .idle
+            self.updatePresentation()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        requestFeedbackTimer = timer
     }
 
     private func scheduleExpirationBoundaryTimer() {
@@ -373,7 +410,7 @@ final class RefreshCoordinator {
         menuController.update(
             state: state,
             refreshing: refreshing,
-            requesting: quotaRefreshRequestInFlight,
+            requestFeedback: requestFeedback,
             canRequest: service.canStartQuotaRefreshRequest,
             loginLaunchState: loginItemManager.state
         )
