@@ -929,12 +929,12 @@ private final class UsageMenuView: NSView {
             }
         }
 
-        gaugeView.frame = NSRect(x: 23, y: 36, width: 82, height: 82)
-        quotaTitleLabel.frame = NSRect(x: 116, y: 40, width: 161, height: 24)
-        resetLabel.frame = NSRect(x: 116, y: 71, width: 161, height: 18)
-        quotaSummaryLabel.frame = NSRect(x: 23, y: 132, width: 254, height: 18)
-        updatedLabel.frame = NSRect(x: 23, y: 154, width: 254, height: 16)
-        errorLabel.frame = NSRect(x: 23, y: 169, width: 254, height: 13)
+        gaugeView.frame = NSRect(x: 23, y: 32, width: 82, height: 82)
+        quotaTitleLabel.frame = NSRect(x: 116, y: 36, width: 161, height: 24)
+        resetLabel.frame = NSRect(x: 116, y: 67, width: 161, height: 18)
+        quotaSummaryLabel.frame = NSRect(x: 23, y: 128, width: 254, height: 18)
+        updatedLabel.frame = NSRect(x: 23, y: 150, width: 254, height: 16)
+        errorLabel.frame = NSRect(x: 23, y: 165, width: 254, height: 13)
 
         refreshButton.frame = NSRect(x: 17, y: 192, width: 128, height: 32)
         requestButton.frame = NSRect(x: 155, y: 192, width: 128, height: 32)
@@ -1391,7 +1391,7 @@ private final class MenuGlassChromeView: NSView {
         drawGlassCard(
             NSRect(
                 x: UsageMenuMetrics.componentInset,
-                y: 19,
+                y: 12,
                 width: UsageMenuMetrics.componentWidth,
                 height: 161
             ),
@@ -1437,8 +1437,8 @@ private final class MenuGlassChromeView: NSView {
         let separatorColor = NSColor.white.withAlphaComponent(0.105)
         separatorColor.setStroke()
         drawLine(
-            from: NSPoint(x: 22, y: 123),
-            to: NSPoint(x: bounds.width - 22, y: 123)
+            from: NSPoint(x: 22, y: 119),
+            to: NSPoint(x: bounds.width - 22, y: 119)
         )
         drawLine(
             from: NSPoint(x: bounds.midX, y: 196),
@@ -1724,7 +1724,13 @@ private final class MenuRowButton: NSButton {
 
         let tint = NSColor.labelColor
         if let symbol {
-            let imageRect = NSRect(x: 2, y: 4, width: 17, height: 17)
+            let imageSize: CGFloat = 17
+            let imageRect = NSRect(
+                x: 2,
+                y: (bounds.height - imageSize) / 2,
+                width: imageSize,
+                height: imageSize
+            )
             symbol.draw(in: imageRect)
             tint.setFill()
             imageRect.fill(using: .sourceAtop)
