@@ -929,7 +929,7 @@ private final class UsageMenuView: NSView {
             }
         }
 
-        gaugeView.frame = NSRect(x: 23, y: 32, width: 82, height: 82)
+        gaugeView.frame = NSRect(x: 23, y: 28, width: 82, height: 82)
         quotaTitleLabel.frame = NSRect(x: 116, y: 36, width: 161, height: 24)
         resetLabel.frame = NSRect(x: 116, y: 67, width: 161, height: 18)
         quotaSummaryLabel.frame = NSRect(x: 23, y: 128, width: 254, height: 18)
@@ -963,7 +963,7 @@ private final class UsageMenuView: NSView {
         quitButton.keyEquivalent = "q"
         quitButton.keyEquivalentModifierMask = [.command]
 
-        shortcutLabel.frame = NSRect(x: 242, y: 345, width: 38, height: 22)
+        shortcutLabel.frame = NSRect(x: 242, y: 348, width: 38, height: 22)
         shortcutLabel.stringValue = "⌘ Q"
         shortcutLabel.alignment = .right
 
@@ -1757,9 +1757,29 @@ private final class MenuRowButton: NSButton {
     }
 }
 
+enum QuotaGaugeWaterGeometry {
+    static func normalizedRemaining(_ remainingPercent: Int) -> CGFloat {
+        min(1, max(0, CGFloat(remainingPercent) / 100))
+    }
+
+    static func surfaceY(
+        in rect: NSRect,
+        remainingPercent: Int
+    ) -> CGFloat {
+        rect.maxY - rect.height * normalizedRemaining(remainingPercent)
+    }
+}
+
 private final class QuotaGaugeView: NSView {
+    private var animationStartedAt = ProcessInfo.processInfo.systemUptime
+    private var animationTimer: Timer?
+    private weak var observedWindow: NSWindow?
+
     var remainingPercent: Int? {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            updateAnimationState()
+        }
     }
 
     var isStale = false {
@@ -1767,6 +1787,48 @@ private final class QuotaGaugeView: NSView {
     }
 
     override var isFlipped: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(displayOptionsChanged),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil
+        )
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+
+        if let observedWindow {
+            NotificationCenter.default.removeObserver(
+                self,
+                name: NSWindow.didChangeOcclusionStateNotification,
+                object: observedWindow
+            )
+        }
+
+        observedWindow = window
+        if let window {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowOcclusionDidChange),
+                name: NSWindow.didChangeOcclusionStateNotification,
+                object: window
+            )
+        }
+        updateAnimationState()
+    }
+
+    deinit {
+        stopAnimation()
+        NotificationCenter.default.removeObserver(self)
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -1786,6 +1848,23 @@ private final class QuotaGaugeView: NSView {
             ending: NSColor.black.withAlphaComponent(0.055)
         )?.draw(in: NSBezierPath(ovalIn: diskRect), angle: -90)
 
+        if let remainingPercent, remainingPercent > 0 {
+            let normalized = QuotaGaugeWaterGeometry.normalizedRemaining(
+                remainingPercent
+            )
+            drawWater(
+                in: diskRect,
+                normalized: normalized,
+                levelY: QuotaGaugeWaterGeometry.surfaceY(
+                    in: diskRect,
+                    remainingPercent: remainingPercent
+                ),
+                elapsed: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                    ? 0
+                    : ProcessInfo.processInfo.systemUptime - animationStartedAt
+            )
+        }
+
         context.setLineWidth(lineWidth)
         context.setLineCap(.round)
         context.setStrokeColor(
@@ -1802,7 +1881,9 @@ private final class QuotaGaugeView: NSView {
         context.strokePath()
 
         if let remainingPercent, remainingPercent > 0 {
-            let normalized = min(1, max(0, CGFloat(remainingPercent) / 100))
+            let normalized = QuotaGaugeWaterGeometry.normalizedRemaining(
+                remainingPercent
+            )
             context.setStrokeColor(
                 (isStale
                     ? NSColor.secondaryLabelColor.withAlphaComponent(0.72)
@@ -1847,5 +1928,114 @@ private final class QuotaGaugeView: NSView {
                 y: bounds.midY - size.height / 2
             )
         )
+    }
+
+    @objc private func displayOptionsChanged() {
+        needsDisplay = true
+        updateAnimationState()
+    }
+
+    @objc private func windowOcclusionDidChange() {
+        updateAnimationState()
+    }
+
+    private func updateAnimationState() {
+        if
+            window?.isVisible == true,
+            window?.occlusionState.contains(.visible) == true,
+            remainingPercent != nil,
+            !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        {
+            startAnimation()
+        } else {
+            stopAnimation()
+        }
+    }
+
+    private func startAnimation() {
+        guard animationTimer == nil else { return }
+        animationStartedAt = ProcessInfo.processInfo.systemUptime
+        let timer = Timer(timeInterval: 1 / 30, repeats: true) {
+            [weak self] _ in
+            self?.needsDisplay = true
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        animationTimer = timer
+    }
+
+    private func stopAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+    }
+
+    private func drawWater(
+        in rect: NSRect,
+        normalized: CGFloat,
+        levelY: CGFloat,
+        elapsed: TimeInterval
+    ) {
+        let components = UsageGradient.color(at: Double(normalized * 100))
+        let waterColor = isStale
+            ? NSColor.secondaryLabelColor
+            : NSColor(
+                calibratedRed: components.red,
+                green: components.green,
+                blue: components.blue,
+                alpha: 1
+            )
+
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(ovalIn: rect).addClip()
+
+        drawWave(
+            in: rect,
+            levelY: levelY + 0.8,
+            amplitude: 4.0,
+            wavelength: 34,
+            phase: -elapsed * 0.72 + 1.4,
+            color: waterColor.withAlphaComponent(0.24)
+        )
+        drawWave(
+            in: rect,
+            levelY: levelY,
+            amplitude: 3.0,
+            wavelength: 43,
+            phase: elapsed * 0.95,
+            color: waterColor.withAlphaComponent(0.52)
+        )
+
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    private func drawWave(
+        in rect: NSRect,
+        levelY: CGFloat,
+        amplitude: CGFloat,
+        wavelength: CGFloat,
+        phase: TimeInterval,
+        color: NSColor
+    ) {
+        let path = NSBezierPath()
+        let sampleCount = max(24, Int(ceil(rect.width)))
+
+        for index in 0...sampleCount {
+            let progress = CGFloat(index) / CGFloat(sampleCount)
+            let x = rect.minX + rect.width * progress
+            let angle = x / wavelength * .pi * 2 + CGFloat(phase)
+            let y = levelY
+                + sin(angle) * amplitude
+                + sin(angle * 0.5 + 0.7) * amplitude * 0.22
+            if index == 0 {
+                path.move(to: NSPoint(x: x, y: y))
+            } else {
+                path.line(to: NSPoint(x: x, y: y))
+            }
+        }
+
+        path.line(to: NSPoint(x: rect.maxX, y: rect.maxY))
+        path.line(to: NSPoint(x: rect.minX, y: rect.maxY))
+        path.close()
+        color.setFill()
+        path.fill()
     }
 }

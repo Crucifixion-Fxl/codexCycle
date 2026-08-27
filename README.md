@@ -32,6 +32,8 @@
 
 - Shows the main Codex five-hour and seven-day quota windows in one compact panel.
 - Keeps the most relevant remaining percentage visible in the macOS menu bar.
+- Turns the selected quota into an animated water level while keeping the exact
+  percentage visible.
 - Refreshes after launch, wake, quota updates, reset boundaries, and every five minutes.
 - Runs a minimal daily Codex request at 7:00 AM to start or roll the five-hour window.
 - Includes Refresh and Request actions without opening a terminal or browser.
@@ -53,8 +55,9 @@ Remaining quota is calculated as `floor(100 - usedPercent)` and clamped to
 seconds. A valid cached reading remains visible in gray after an ordinary
 refresh failure and expires at its own reset boundary.
 
-The ring follows a fixed red, yellow, and green scale. It is red at `0`, yellow
-at `20`, and green from `50` through `100`.
+The gauge's animated water height matches the remaining quota percentage while
+the number and outside ring remain visible. The color scale is red at `0`, yellow
+at `20`, and green from `50` through `100`. Reduce Motion freezes the water.
 
 ## Requirements
 

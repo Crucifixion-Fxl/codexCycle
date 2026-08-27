@@ -110,6 +110,10 @@ If the selected plan window is unavailable, its value shows `—`.
   weekly below a five-hour gauge, or five-hour below a weekly gauge. A missing
   secondary reading remains visible as `—`. The status-bar indicator follows the
   same primary-window rule as the panel and omits `%`.
+- The circular gauge fills with two counter-moving water layers whose mean
+  surface height matches the selected window's remaining percentage. The
+  centered percentage and outside progress ring remain visible. Animate only
+  while the panel is visible, and freeze the water when Reduce Motion is enabled.
 - Each reset countdown corresponds to its own window and uses at most two units
   with no seconds.
 - Dynamic quota text remains single-line with tail truncation when needed. Hovering
@@ -178,7 +182,7 @@ If the selected plan window is unavailable, its value shows `—`.
 - A fake JSONL app-server process covers initialization, timeout, process exit, sparse-update handling, and full-snapshot refresh without a real account.
 - Real acceptance verifies Follow System and both explicit language choices, the five-hour indicator and dual-window menu, reset refresh, manual and periodic refresh, wake refresh, scheduled and manual Codex requests, login launch, real quota percentages, cache and stale states, independent CLI discovery, current ChatGPT Desktop-only discovery, source priority, and error states.
 - Reading limits must not start model work or consume model usage. The scheduled 7:00 AM request and explicit Request Now action each start a minimal Codex turn and consume a small amount of the user's quota.
-- Idle operation must not continuously consume CPU.
+- Idle operation and a hidden panel must not continuously consume CPU.
 
 ## Primary references
 
