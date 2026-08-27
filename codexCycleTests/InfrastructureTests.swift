@@ -12,6 +12,39 @@ final class InfrastructureTests: XCTestCase {
         XCTAssertEqual(UsageGradient.color(at: 100), UsageGradient.green)
     }
 
+    func testQuotaGaugeWaterLevelTracksRemainingPercentage() {
+        let rect = NSRect(x: 10, y: 20, width: 80, height: 60)
+
+        XCTAssertEqual(
+            QuotaGaugeWaterGeometry.surfaceY(
+                in: rect,
+                remainingPercent: 0
+            ),
+            rect.maxY
+        )
+        XCTAssertEqual(
+            QuotaGaugeWaterGeometry.surfaceY(
+                in: rect,
+                remainingPercent: 50
+            ),
+            rect.midY
+        )
+        XCTAssertEqual(
+            QuotaGaugeWaterGeometry.surfaceY(
+                in: rect,
+                remainingPercent: 100
+            ),
+            rect.minY
+        )
+        XCTAssertEqual(
+            QuotaGaugeWaterGeometry.surfaceY(
+                in: rect,
+                remainingPercent: 120
+            ),
+            rect.minY
+        )
+    }
+
     func testDiscoversCurrentDesktopRuntimeWithoutIndependentCLI() throws {
         let fixture = try RuntimeDiscoveryFixture()
         defer { fixture.remove() }
