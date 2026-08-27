@@ -73,7 +73,7 @@ The interface follows the language selected by macOS by default. English and Sim
 
 ## Menu
 
-The app has no main window. Clicking the indicator toggles a compact 300 × 414 pt
+The app has no main window. Clicking the indicator toggles a compact 300 × 378 pt
 floating `NSPanel` in the selected interface language. The panel uses a dark,
 low-saturation glass surface with independent shadow and four equal-width stacked
 components: usage, actions, language, and settings. It avoids stacking a separate
@@ -97,8 +97,7 @@ The visual hierarchy is:
 ╰───────────────────────┴──────────────────╯
        [ System ]       EN        简中
 ╭──────────────────────────────────────────╮
-│  Launch at Login Disabled                │
-│  Login Items Settings…                   │
+│  Launch at Login                 [on/off] │
 ╰──────────────────────────────────────────╯
 Quit codexCycle                            ⌘ Q
 ```
@@ -121,8 +120,9 @@ If the selected plan window is unavailable, its value shows `—`.
 - Errors add one short localized reason when supported quotas are unavailable or
   the request fails.
 - The menu and read-only diagnostics use Follow System, English, or Simplified Chinese localization. Follow System is the default; an explicit override is stored in `display.language` and takes effect immediately.
-- Always show the current launch-at-login state and provide a localized action
-  that opens Login Items Settings.
+- Show one localized Launch at Login row with a switch. Toggling it registers or
+  unregisters the main app directly and refreshes the switch from the effective
+  `SMAppService` state without opening System Settings.
 - Refresh, request, and language-selection actions update the open panel in place;
   they do not dismiss it.
 - A Codex request progresses through localized requesting, success, or failure
@@ -152,7 +152,8 @@ If the selected plan window is unavailable, its value shows `—`.
 ## Launch, privacy, and lifecycle
 
 - Register the main app with `SMAppService.mainApp` so it launches on login.
-- Respect a user-disabled login item. Do not repeatedly re-register it; show an action that opens the system Login Items settings.
+- Respect a user-disabled login item. Do not repeatedly re-register it; only an
+  explicit action on the in-app Launch at Login switch may register it again.
 - Do not collect analytics, telemetry, or crash reports.
 - `codexCycle` performs no direct external network requests; Codex service access remains owned by the selected Codex Runtime.
 - Prevent duplicate running instances.
