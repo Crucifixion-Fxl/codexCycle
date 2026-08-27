@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/codexcycle-status-item.png" width="68" alt="codexCycle 状态栏余量指示器，显示剩余 98%">
+  <img src="docs/images/codexcycle-status-item.png" width="68" alt="codexCycle 状态栏余量指示器，显示剩余 96%">
 </p>
 
 <h1 align="center">codexCycle</h1>
@@ -22,6 +22,10 @@
 
 <p align="center">
   <a href="https://github.com/Crucifixion-Fxl/codexCycle/releases/latest"><strong>下载最新版 DMG</strong></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/codexcycle-detail-panel.png" width="360" alt="codexCycle 二级面板，显示 5 小时和周余量">
 </p>
 
 ## 主要功能

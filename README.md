@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/codexcycle-status-item.png" width="68" alt="codexCycle menu-bar quota indicator showing 98 percent remaining">
+  <img src="docs/images/codexcycle-status-item.png" width="68" alt="codexCycle menu-bar quota indicator showing 96 percent remaining">
 </p>
 
 <h1 align="center">codexCycle</h1>
@@ -22,6 +22,10 @@
 
 <p align="center">
   <a href="https://github.com/Crucifixion-Fxl/codexCycle/releases/latest"><strong>Download the latest DMG</strong></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/codexcycle-detail-panel.png" width="360" alt="codexCycle detail panel showing five-hour and weekly quota information">
 </p>
 
 ## Highlights
