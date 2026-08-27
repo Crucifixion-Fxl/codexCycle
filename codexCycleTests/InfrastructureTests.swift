@@ -879,7 +879,7 @@ final class InfrastructureTests: XCTestCase {
     @MainActor
     func testCompactPanelMatchesReferenceLayout() throws {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
-        let controller = StatusMenuController(language: .simplifiedChinese)
+        let controller = StatusMenuController(language: .english)
         controller.update(
             state: .fresh(
                 QuotaUsageSnapshot(
@@ -893,20 +893,27 @@ final class InfrastructureTests: XCTestCase {
             ),
             refreshing: false,
             canRequest: true,
-            loginLaunchState: .disabled,
+            loginLaunchState: .enabled,
             now: now
         )
 
         XCTAssertEqual(controller.presentationSnapshot.panelRemainingPercent, 88)
         XCTAssertEqual(controller.presentationSnapshot.indicatorRemainingPercent, 88)
-        XCTAssertEqual(controller.presentationSnapshot.panelQuotaTitle, "周余量")
-        XCTAssertEqual(controller.presentationSnapshot.panelResetTitle, "5 天 8 小时后重置")
+        XCTAssertEqual(controller.presentationSnapshot.panelQuotaTitle, "Weekly remaining")
+        XCTAssertEqual(
+            controller.presentationSnapshot.panelResetTitle,
+            "Resets in 5 days 8 hours"
+        )
         XCTAssertEqual(
             controller.presentationSnapshot.panelSummaryTitle,
-            "5 小时余量 —   ·   5 小时重置 —"
+            "5-hour remaining —   ·   resets in —"
         )
-        XCTAssertEqual(controller.presentationSnapshot.loginLaunchTitle, "登录时启动")
-        XCTAssertFalse(controller.presentationSnapshot.loginLaunchIsEnabled)
+        XCTAssertEqual(
+            controller.presentationSnapshot.loginLaunchTitle,
+            "Launch at Login"
+        )
+        XCTAssertTrue(controller.presentationSnapshot.loginLaunchIsEnabled)
+        XCTAssertEqual(controller.loginLaunchSwitchTrackColor, .systemGreen)
 
         let image = try XCTUnwrap(controller.renderedMenuImage())
         let data = try XCTUnwrap(image.tiffRepresentation)
@@ -928,8 +935,8 @@ final class InfrastructureTests: XCTestCase {
         controller.onSetLoginLaunchEnabled = {
             requestedLoginLaunchState = $0
         }
-        controller.simulateLoginLaunchToggleForTesting(isEnabled: true)
-        XCTAssertEqual(requestedLoginLaunchState, true)
+        controller.simulateLoginLaunchToggleForTesting(isEnabled: false)
+        XCTAssertEqual(requestedLoginLaunchState, false)
     }
 
     @MainActor
