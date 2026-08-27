@@ -122,7 +122,8 @@ If the selected plan window is unavailable, its value shows `—`.
 - The menu and read-only diagnostics use Follow System, English, or Simplified Chinese localization. Follow System is the default; an explicit override is stored in `display.language` and takes effect immediately.
 - Show one localized Launch at Login row with a switch. Toggling it registers or
   unregisters the main app directly and refreshes the switch from the effective
-  `SMAppService` state without opening System Settings.
+  `SMAppService` state without opening System Settings. The switch uses system
+  green while enabled and a neutral gray track while disabled.
 - Refresh, request, and language-selection actions update the open panel in place;
   they do not dismiss it.
 - A Codex request progresses through localized requesting, success, or failure

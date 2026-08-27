@@ -188,6 +188,10 @@ final class StatusMenuController: NSObject {
         menuView.hoverExpansionSnapshot
     }
 
+    var loginLaunchSwitchTrackColor: NSColor {
+        menuView.loginLaunchSwitchTrackColor
+    }
+
     func simulateQuotaSummaryHoverForTesting() {
         menuView.simulateQuotaSummaryHoverForTesting()
     }
@@ -677,7 +681,7 @@ private final class UsageMenuView: NSView {
     private let loginLaunchLabel = UsageMenuView.rowButton(
         symbolName: "lock"
     )
-    private let loginLaunchSwitch = NSSwitch(frame: .zero)
+    private let loginLaunchSwitch = GreenOnSwitch(frame: .zero)
     private let quitButton = NSButton(title: "", target: nil, action: nil)
     private let shortcutLabel = UsageMenuView.label(
         font: .systemFont(ofSize: 12.3, weight: .regular),
@@ -707,6 +711,10 @@ private final class UsageMenuView: NSView {
 
     var hoverExpansionSnapshot: HoverExpansionSnapshot {
         hoverExpansionPresenter.snapshot
+    }
+
+    var loginLaunchSwitchTrackColor: NSColor {
+        loginLaunchSwitch.trackColor
     }
 
     func simulateQuotaSummaryHoverForTesting() {
@@ -1045,6 +1053,72 @@ private final class UsageMenuView: NSView {
 
     private static func rowButton(symbolName: String) -> MenuRowButton {
         MenuRowButton(symbolName: symbolName)
+    }
+}
+
+private final class GreenOnSwitch: NSControl {
+    var state: NSControl.StateValue = .off {
+        didSet { needsDisplay = true }
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 40, height: 22)
+    }
+
+    var trackColor: NSColor {
+        state == .on
+            ? .systemGreen
+            : NSColor.white.withAlphaComponent(0.18)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let trackRect = bounds.insetBy(dx: 1, dy: 2)
+        let trackPath = NSBezierPath(
+            roundedRect: trackRect,
+            xRadius: trackRect.height / 2,
+            yRadius: trackRect.height / 2
+        )
+        trackColor.setFill()
+        trackPath.fill()
+
+        let knobDiameter = trackRect.height - 4
+        let knobX = state == .on
+            ? trackRect.maxX - knobDiameter - 2
+            : trackRect.minX + 2
+        let knobRect = NSRect(
+            x: knobX,
+            y: trackRect.midY - knobDiameter / 2,
+            width: knobDiameter,
+            height: knobDiameter
+        )
+        let knobPath = NSBezierPath(ovalIn: knobRect)
+        NSColor.white.withAlphaComponent(isEnabled ? 0.96 : 0.55).setFill()
+        knobPath.fill()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
+        state = state == .on ? .off : .on
+        sendAction(action, to: target)
+    }
+
+    override func isAccessibilityElement() -> Bool {
+        true
+    }
+
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        .checkBox
+    }
+
+    override func accessibilityValue() -> Any? {
+        state == .on
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled else { return false }
+        state = state == .on ? .off : .on
+        sendAction(action, to: target)
+        return true
     }
 }
 

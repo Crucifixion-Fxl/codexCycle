@@ -1,106 +1,161 @@
-# codexCycle
+<p align="center">
+  <img src="docs/images/codexcycle-status-item.png" width="96" alt="codexCycle menu-bar indicator">
+</p>
 
-**English** | [简体中文](README.zh-CN.md)
-
-`codexCycle` is a lightweight macOS menu-bar app that keeps your five-hour and
-weekly Codex quotas visible without opening another window. It refreshes
-automatically and uses your existing local Codex authentication.
+<h1 align="center">codexCycle</h1>
 
 <p align="center">
-  <img src="docs/images/codexcycle-status-item.png" width="100" alt="codexCycle menu-bar indicator showing 85 percent remaining">
+  A native macOS menu-bar app for keeping Codex five-hour and weekly quotas in view.
 </p>
 
 <p align="center">
-  <img src="docs/images/codexcycle-detail-panel.png" width="300" alt="codexCycle detail panel showing weekly and five-hour quota information">
+  <a href="README.md"><strong>English</strong></a> ·
+  <a href="README.zh-CN.md">简体中文</a>
 </p>
 
-## What it shows
+<p align="center">
+  <a href="https://github.com/Crucifixion-Fxl/codexCycle/releases/latest"><img src="https://img.shields.io/github/v/release/Crucifixion-Fxl/codexCycle?display_name=tag" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-000000?logo=apple" alt="macOS 13 or later">
+  <img src="https://img.shields.io/badge/Apple%20Silicon-arm64-555555" alt="Apple Silicon arm64">
+  <img src="https://img.shields.io/badge/Swift-AppKit-F05138?logo=swift&logoColor=white" alt="Swift and AppKit">
+</p>
 
-- The number in the menu bar is the five-hour remaining percentage. The center
-  omits the `%` sign to stay readable at menu-bar size.
-- The remaining arc follows a fixed red → yellow → green scale: red at `0`,
-  yellow at `20`, and green from `50` through `100`.
-- Clicking the indicator opens the five-hour and weekly readings, their reset
-  countdowns, the last update time, Refresh Now, and Request Now.
-- The interface follows the language selected by macOS by default. The menu can
-  switch explicitly between Follow System, English, and Simplified Chinese.
+<p align="center">
+  <a href="https://github.com/Crucifixion-Fxl/codexCycle/releases/latest"><strong>Download the latest DMG</strong></a>
+</p>
 
-## Display logic
+<p align="center">
+  <img src="docs/images/codexcycle-detail-panel.png" width="360" alt="codexCycle detail panel showing five-hour and weekly quota information">
+</p>
 
-- Only the main `codex` bucket's exact five-hour and seven-day windows are shown.
-  Other windows are ignored rather than substituted.
-- Remaining quota is `floor(100 - usedPercent)`, clamped to `0...100`.
-- A failed refresh keeps a valid cached number but turns the ring gray. A reading
-  expires at its reset boundary; no valid reading is shown as `—`.
-- Reset time is relative, uses at most two units, and never displays seconds.
-- Data refreshes on launch, every five minutes, after wake, after a quota update,
-  at either reset boundary, and on manual refresh.
-- At 7:00 AM local time each day, the app makes one minimal, ephemeral, read-only
-  Codex request to start or roll the five-hour window, then reads the quotas
-  again. A sleeping or closed Mac catches up once after the next wake or launch.
-- **Request Now** runs the same safe request on demand and refreshes the quota
-  readings when it completes.
+## Highlights
+
+- Shows the main Codex five-hour and seven-day quota windows in one compact panel.
+- Keeps the most relevant remaining percentage visible in the macOS menu bar.
+- Refreshes after launch, wake, quota updates, reset boundaries, and every five minutes.
+- Runs a minimal daily Codex request at 7:00 AM to start or roll the five-hour window.
+- Includes Refresh and Request actions without opening a terminal or browser.
+- Supports Follow System, English, and Simplified Chinese interface modes.
+- Controls Launch at Login directly from the panel with an in-app switch.
+- Stores no credentials and sends no analytics or telemetry.
+
+## Display behavior
+
+| Available quota windows | Menu-bar indicator | Main panel reading | Secondary reading |
+| --- | --- | --- | --- |
+| Five-hour and weekly | Five-hour | Five-hour | Weekly |
+| Weekly only | Weekly | Weekly | Five-hour unavailable |
+| Five-hour only | Five-hour | Five-hour | Weekly unavailable |
+| Neither | Unavailable | Unavailable | Unavailable |
+
+Remaining quota is calculated as `floor(100 - usedPercent)` and clamped to
+`0...100`. Reset countdowns use relative time with at most two units and no
+seconds. A valid cached reading remains visible in gray after an ordinary
+refresh failure and expires at its own reset boundary.
+
+The ring follows a fixed red, yellow, and green scale. It is red at `0`, yellow
+at `20`, and green from `50` through `100`.
 
 ## Requirements
 
 - Apple Silicon Mac
 - macOS 13 or later
-- An installed and authenticated Codex Runtime:
-  - an independent Codex CLI, or
+- One authenticated Codex Runtime
+  - an independent Codex CLI
   - Codex in the current ChatGPT desktop app
 
 ## Install
 
-Download the latest arm64 DMG from
-[GitHub Releases](https://github.com/Crucifixion-Fxl/codexCycle/releases/latest),
-open it, and drag `codexCycle.app` into `Applications`.
+1. Download the latest arm64 DMG from [GitHub Releases](https://github.com/Crucifixion-Fxl/codexCycle/releases/latest).
+2. Open the DMG.
+3. Drag `codexCycle.app` into `Applications`.
+4. Launch `codexCycle` and use the menu-bar indicator.
 
-Public builds currently use ad hoc signing and are not notarized. On first
-launch, macOS may require approval in **System Settings → Privacy & Security →
-Open Anyway**. Only install releases from this repository.
+Public builds use ad hoc signing and are not notarized. macOS may ask for a
+first-launch confirmation under **System Settings → Privacy & Security → Open
+Anyway**. Install releases only from this repository.
+
+## Everyday use
+
+- Click the menu-bar indicator to open or close the detail panel.
+- Use **Refresh** to read the latest quota state.
+- Use **Request** to run one minimal Codex turn and refresh both windows.
+- Use the language control to follow macOS or select English or Simplified Chinese.
+- Use **Launch at Login** to register or unregister the app directly.
+- Use **Quit codexCycle** or `⌘ Q` to stop the current process.
+
+The scheduled 7:00 AM request and the explicit Request action each consume a
+small amount of Codex quota. Reading the current limits does not start model
+work.
+
+## Runtime and privacy
+
+`codexCycle` discovers a compatible local Runtime and communicates with
+`codex app-server --stdio`. It reads `account/rateLimits/read` and listens for
+rate-limit update notifications. The app validates Runtime ownership,
+permissions, executable shape, and code signatures before launch.
+
+The app does not
+
+- read, copy, store, display, or log Codex credentials
+- make direct network requests to the Codex service
+- collect analytics, telemetry, or crash reports
+- include a login flow or self-updater
+
+Daily and manually requested turns run as ephemeral `codex exec` sessions with
+a read-only sandbox, ignored user configuration, and a 90-second timeout.
 
 ## Build from source
 
-```sh
-make test       # Run the test suite
-make install    # Build, install to /Applications, and launch
-```
-
-Additional targets:
+The project uses Xcode, Swift, and AppKit with no third-party packages.
 
 ```sh
-make build      # Debug build
-make release    # Release build
+make build      # Build the Debug app
+make test       # Run the XCTest suite
+make release    # Build and locally sign the Release app
 make dmg        # Create dist/codexCycle-<version>-arm64.dmg
+make install    # Replace /Applications/codexCycle.app and launch it
 make uninstall  # Remove the app and preserve preferences
 make purge      # Remove the app and its preferences
 ```
 
-## Data and privacy
+## Project layout
 
-`codexCycle` reads `account/rateLimits/read` from a local
-`codex app-server --stdio` process. Daily and manually requested quota-refresh
-turns run through the validated local Runtime as ephemeral `codex exec` sessions
-with a read-only sandbox, tools disabled by instruction, and user configuration
-ignored. The app does not read or store credentials, make direct network
-requests, collect analytics, or send telemetry. Runtime executables are
-validated before launch.
-
-For implementation details, see the [product specification](docs/product-spec.md)
-and the [runtime](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md)
-and [sandbox](docs/adr/0002-run-outside-the-app-sandbox.md) decisions.
+| Path | Responsibility |
+| --- | --- |
+| `codexCycle/Domain` | Quota models, selection rules, and remaining calculations |
+| `codexCycle/Infrastructure` | Runtime discovery, app-server transport, cache, and login item management |
+| `codexCycle/Coordination` | Refresh scheduling, retries, wake handling, and daily requests |
+| `codexCycle/Presentation` | Menu-bar indicator, detail panel, localization, and relative time |
+| `codexCycleTests` | Parser, cache, Runtime, scheduling, presentation, and regression tests |
+| `docs/adr` | Architecture decisions and operational constraints |
 
 ## Troubleshooting
 
-- **Codex Runtime not found:** install Codex CLI, or install and sign in to the
-  current ChatGPT desktop app.
-- **Codex Runtime incompatible:** update Codex CLI or ChatGPT, then choose
-  **Refresh Now**.
-- **Codex is not signed in:** sign in through the corresponding Codex product.
-- **Launch at Login Disabled:** turn on **Launch at Login** in the app menu.
+| Symptom | What to do |
+| --- | --- |
+| Codex Runtime not found | Install Codex CLI, or install and sign in to the current ChatGPT desktop app |
+| Codex Runtime incompatible | Update Codex CLI or ChatGPT, then select **Refresh** |
+| Codex is not signed in | Sign in through the corresponding Codex product |
+| Launch at Login is off | Turn on **Launch at Login** in the codexCycle panel |
+| macOS blocks first launch | Use **Open Anyway** under Privacy & Security |
 
-Read-only diagnostics:
+Read-only diagnostics are available from the installed app.
 
 ```sh
 /Applications/codexCycle.app/Contents/MacOS/codexCycle --diagnose
 ```
+
+## Documentation
+
+- [Product specification](docs/product-spec.md)
+- [Codex app-server decision](docs/adr/0001-use-codex-app-server-for-rate-limits.md)
+- [Non-sandboxed Runtime decision](docs/adr/0002-run-outside-the-app-sandbox.md)
+- [Runtime discovery and trust decision](docs/adr/0003-support-independent-and-desktop-codex-runtimes.md)
+- [Daily request decision](docs/adr/0004-use-ephemeral-codex-exec-for-daily-five-hour-refresh.md)
+
+## Contributing
+
+Issues and focused pull requests are welcome. Please run `make test` before
+opening a pull request and keep behavior changes aligned with the product
+specification and architecture decisions.
