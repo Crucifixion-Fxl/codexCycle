@@ -102,7 +102,7 @@ The visual hierarchy is:
 Quit codexCycle                            ⌘ Q
 ```
 
-The usage component begins 7 pt below the shared 12 pt component inset baseline.
+The usage component begins at the shared 12 pt component inset baseline.
 If the selected plan window is unavailable, its value shows `—`.
 
 - The menu's circular gauge, adjacent title, and reset countdown present the
