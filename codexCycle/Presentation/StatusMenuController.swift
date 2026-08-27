@@ -175,6 +175,12 @@ final class StatusMenuController: NSObject {
         )
     }
 
+    var hasTruncatedDynamicText: Bool { menuView.hasTruncatedDynamicText }
+
+    var expansionTooltipsAreCorrect: Bool {
+        menuView.expansionTooltipsAreCorrect
+    }
+
     func renderedMenuImage() -> NSImage? {
         menuView.layoutSubtreeIfNeeded()
         markNeedsDisplay(menuView)
@@ -670,6 +676,28 @@ private final class UsageMenuView: NSView {
     var onOpenLoginSettings: (() -> Void)?
     var onQuit: (() -> Void)?
 
+    private var dynamicTextLabels: [NSTextField] {
+        [
+            quotaTitleLabel,
+            resetLabel,
+            quotaSummaryLabel,
+            updatedLabel,
+            errorLabel
+        ]
+    }
+
+    var hasTruncatedDynamicText: Bool {
+        dynamicTextLabels.contains(where: isTruncated)
+    }
+
+    var expansionTooltipsAreCorrect: Bool {
+        dynamicTextLabels.allSatisfy { label in
+            isTruncated(label)
+                ? label.toolTip == label.stringValue
+                : label.toolTip == nil
+        }
+    }
+
     override var isFlipped: Bool { true }
 
     override init(frame frameRect: NSRect) {
@@ -737,6 +765,7 @@ private final class UsageMenuView: NSView {
         updatedLabel.stringValue = updatedTitle
         errorLabel.stringValue = errorTitle ?? ""
         errorLabel.isHidden = errorTitle == nil
+        updateExpansionTooltips()
 
         refreshButton.title = refreshTitle
         refreshButton.isEnabled = refreshIsEnabled
@@ -787,6 +816,24 @@ private final class UsageMenuView: NSView {
             NSImage.SymbolConfiguration(pointSize: 15.4, weight: .light)
         )
         requestButton.contentTintColor = tintColor
+    }
+
+    private func updateExpansionTooltips() {
+        for label in dynamicTextLabels {
+            guard !label.isHidden else {
+                label.toolTip = nil
+                continue
+            }
+            label.toolTip = isTruncated(label) ? label.stringValue : nil
+        }
+    }
+
+    private func isTruncated(_ label: NSTextField) -> Bool {
+        guard !label.isHidden, let cell = label.cell else { return false }
+        return !cell.expansionFrame(
+            withFrame: label.bounds,
+            in: label
+        ).isEmpty
     }
 
     private func configureSubviews() {

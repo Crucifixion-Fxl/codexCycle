@@ -742,6 +742,35 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
+    func testTruncatedQuotaTextExpandsOnHover() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let controller = StatusMenuController(language: .english)
+        controller.update(
+            state: .fresh(
+                QuotaUsageSnapshot(
+                    fiveHour: QuotaUsageReading(
+                        remainingPercent: 75,
+                        resetsAt: now.addingTimeInterval(4 * 3_600 + 59 * 60),
+                        fetchedAt: now
+                    ),
+                    weekly: QuotaUsageReading(
+                        remainingPercent: 42,
+                        resetsAt: now.addingTimeInterval(6 * 86_400 + 23 * 3_600),
+                        fetchedAt: now
+                    )
+                )
+            ),
+            refreshing: false,
+            canRequest: true,
+            loginLaunchState: .enabled,
+            now: now
+        )
+
+        XCTAssertTrue(controller.hasTruncatedDynamicText)
+        XCTAssertTrue(controller.expansionTooltipsAreCorrect)
+    }
+
+    @MainActor
     func testMenuDefaultsToFollowSystemAndDisablesRequestWithoutRuntime() {
         let controller = StatusMenuController()
 
