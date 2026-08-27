@@ -113,6 +113,9 @@ If the selected plan window is unavailable, its value shows `—`.
   same primary-window rule as the panel and omits `%`.
 - Each reset countdown corresponds to its own window and uses at most two units
   with no seconds.
+- Dynamic quota text remains single-line with tail truncation when needed. Hovering
+  a truncated label shows its complete localized text in a native tooltip; labels
+  that already fit do not show one.
 - Status-indicator colors always correspond to its selected primary reading.
 - The menu recalculates relative times at least once per minute while the app runs.
 - Errors add one short localized reason when supported quotas are unavailable or
