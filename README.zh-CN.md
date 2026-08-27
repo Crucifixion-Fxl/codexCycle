@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/codexcycle-status-item.png" width="68" alt="codexCycle 状态栏余量指示器，显示剩余 96%">
+  <img src="docs/images/codexcycle-status-item-dark.png" width="68" alt="codexCycle 状态栏余量指示器，显示剩余 96%">
 </p>
 
 <h1 align="center">codexCycle</h1>
