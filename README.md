@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/codexcycle-status-item.png" width="68" alt="codexCycle menu-bar quota indicator showing 96 percent remaining">
+  <img src="docs/images/codexcycle-status-item-dark.png" width="68" alt="codexCycle menu-bar quota indicator showing 96 percent remaining">
 </p>
 
 <h1 align="center">codexCycle</h1>
