@@ -21,7 +21,7 @@ final class RelativeTimeFormatterTests: XCTestCase {
                 now: now,
                 localization: localization
             ),
-            "4 hours 18 minutes"
+            "4 hours 18 mins"
         )
         XCTAssertEqual(
             RelativeTimeText.countdown(
@@ -54,7 +54,7 @@ final class RelativeTimeFormatterTests: XCTestCase {
                 now: now,
                 localization: localization
             ),
-            "3 minutes ago"
+            "3 mins ago"
         )
         XCTAssertEqual(
             RelativeTimeText.since(

@@ -43,7 +43,7 @@
 "unit.hour.one" = "%d hour";
 "unit.hour.other" = "%d hours";
 "unit.minute.one" = "%d minute";
-"unit.minute.other" = "%d minutes";
+"unit.minute.other" = "%d mins";
 
 "error.runtime_not_found" = "Codex Runtime not found";
 "error.incompatible_runtime" = "Codex Runtime incompatible";
