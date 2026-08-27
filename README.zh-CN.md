@@ -9,6 +9,10 @@ Codex 5 小时和周余量。它会自动刷新，并复用本机现有的 Codex
   <img src="docs/images/codexcycle-status-item.png" width="100" alt="codexCycle 状态栏指示器，显示剩余 85">
 </p>
 
+<p align="center">
+  <img src="docs/images/codexcycle-detail-panel.png" width="300" alt="codexCycle 二级面板，显示周余量和 5 小时余量信息">
+</p>
+
 ## 显示内容
 
 - 状态栏中心数字表示 5 小时余量百分比。为保证小尺寸下清晰，中心不显示 `%` 符号。
@@ -81,7 +85,7 @@ Runtime 前会验证可执行文件。
 - **未找到 Codex Runtime：** 安装 Codex CLI，或安装并登录当前 ChatGPT 桌面应用。
 - **Codex Runtime 不兼容：** 更新 Codex CLI 或 ChatGPT，然后选择**立即刷新**。
 - **Codex 尚未登录：** 通过对应的 Codex 产品完成登录。
-- **登录启动已禁用：** 从应用菜单打开“登录项”设置并允许 `codexCycle`。
+- **登录启动已禁用：** 在应用菜单中打开“登录时启动”开关。
 
 只读诊断：
 

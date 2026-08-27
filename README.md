@@ -10,6 +10,10 @@ automatically and uses your existing local Codex authentication.
   <img src="docs/images/codexcycle-status-item.png" width="100" alt="codexCycle menu-bar indicator showing 85 percent remaining">
 </p>
 
+<p align="center">
+  <img src="docs/images/codexcycle-detail-panel.png" width="300" alt="codexCycle detail panel showing weekly and five-hour quota information">
+</p>
+
 ## What it shows
 
 - The number in the menu bar is the five-hour remaining percentage. The center
@@ -93,8 +97,7 @@ and [sandbox](docs/adr/0002-run-outside-the-app-sandbox.md) decisions.
 - **Codex Runtime incompatible:** update Codex CLI or ChatGPT, then choose
   **Refresh Now**.
 - **Codex is not signed in:** sign in through the corresponding Codex product.
-- **Launch at Login Disabled:** open Login Items Settings from the app menu and
-  allow `codexCycle`.
+- **Launch at Login Disabled:** turn on **Launch at Login** in the app menu.
 
 Read-only diagnostics:
 

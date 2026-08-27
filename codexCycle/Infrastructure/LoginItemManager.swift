@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import ServiceManagement
 
 enum LoginLaunchState: Equatable {
@@ -6,19 +7,35 @@ enum LoginLaunchState: Equatable {
     case disabled
 }
 
+protocol LoginItemServicing: AnyObject {
+    var status: SMAppService.Status { get }
+    func register() throws
+    func unregister() throws
+}
+
+extension SMAppService: LoginItemServicing {}
+
 final class LoginItemManager {
     private let preferences: AppPreferences
+    private let service: LoginItemServicing
+    private let logger = Logger(
+        subsystem: "com.fxl.codexCycle",
+        category: "login-item"
+    )
 
-    init(preferences: AppPreferences) {
+    init(
+        preferences: AppPreferences,
+        service: LoginItemServicing = SMAppService.mainApp
+    ) {
         self.preferences = preferences
+        self.service = service
     }
 
     var state: LoginLaunchState {
-        SMAppService.mainApp.status == .enabled ? .enabled : .disabled
+        service.status == .enabled ? .enabled : .disabled
     }
 
     func registerOnFirstLaunchIfNeeded() {
-        let service = SMAppService.mainApp
         guard service.status == .notRegistered else {
             return
         }
@@ -30,11 +47,26 @@ final class LoginItemManager {
         try? service.register()
     }
 
-    func openSystemSettings() {
-        SMAppService.openSystemSettingsLoginItems()
+    @discardableResult
+    func setEnabled(_ isEnabled: Bool) -> LoginLaunchState {
+        preferences.attemptedLoginRegistration = true
+        do {
+            if isEnabled {
+                guard service.status != .enabled else { return .enabled }
+                try service.register()
+            } else {
+                guard service.status != .notRegistered else { return .disabled }
+                try service.unregister()
+            }
+        } catch {
+            logger.error(
+                "Failed to set launch at login to \(isEnabled, privacy: .public): \(String(reflecting: error), privacy: .public)"
+            )
+        }
+        return state
     }
 
     func unregister() {
-        try? SMAppService.mainApp.unregister()
+        try? service.unregister()
     }
 }

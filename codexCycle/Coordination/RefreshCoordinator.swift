@@ -119,8 +119,10 @@ final class RefreshCoordinator {
             self.preferences.appLanguage = language
             self.menuController.setLanguage(language)
         }
-        menuController.onOpenLoginSettings = { [weak self] in
-            self?.loginItemManager.openSystemSettings()
+        menuController.onSetLoginLaunchEnabled = { [weak self] isEnabled in
+            guard let self else { return }
+            self.loginItemManager.setEnabled(isEnabled)
+            self.updatePresentation()
         }
 
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(

@@ -15,9 +15,7 @@
 "menu.language_system" = "跟随系统";
 "menu.language_english" = "English";
 "menu.language_simplified_chinese" = "简体中文";
-"menu.login_disabled" = "登录启动已禁用";
-"menu.login_enabled" = "登录启动已启用";
-"menu.open_login_settings" = "打开登录项设置…";
+"menu.launch_at_login" = "登录时启动";
 "menu.quit" = "退出 codexCycle";
 "menu.usage" = "用量";
 "menu.reset_compact" = "%@后重置";
@@ -33,7 +31,6 @@
 "menu.language_system_compact" = "系统";
 "menu.language_english_compact" = "EN";
 "menu.language_simplified_chinese_compact" = "简中";
-"menu.open_login_settings_compact" = "登录项设置…";
 
 "relative.less_than_one_minute" = "不足 1 分钟";
 "relative.just_now" = "刚刚";

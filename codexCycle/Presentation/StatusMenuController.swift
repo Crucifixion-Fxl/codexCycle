@@ -105,6 +105,8 @@ struct StatusMenuPresentationSnapshot {
     let errorTitle: String?
     let requestTitle: String
     let requestIsEnabled: Bool
+    let loginLaunchTitle: String
+    let loginLaunchIsEnabled: Bool
     let systemLanguageIsSelected: Bool
     let englishLanguageIsSelected: Bool
     let simplifiedChineseLanguageIsSelected: Bool
@@ -159,7 +161,7 @@ final class StatusMenuController: NSObject {
     var onRefresh: (() -> Void)?
     var onRequest: (() -> Void)?
     var onSelectLanguage: ((AppLanguage) -> Void)?
-    var onOpenLoginSettings: (() -> Void)?
+    var onSetLoginLaunchEnabled: ((Bool) -> Void)?
 
     var layoutSnapshot: StatusItemLayoutSnapshot {
         StatusItemLayoutSnapshot(
@@ -192,6 +194,10 @@ final class StatusMenuController: NSObject {
 
     func simulateQuotaSummaryExitForTesting() {
         menuView.simulateQuotaSummaryExitForTesting()
+    }
+
+    func simulateLoginLaunchToggleForTesting(isEnabled: Bool) {
+        menuView.simulateLoginLaunchToggleForTesting(isEnabled: isEnabled)
     }
 
     func renderedMenuImage() -> NSImage? {
@@ -229,6 +235,8 @@ final class StatusMenuController: NSObject {
             errorTitle: errorTitle,
             requestTitle: requestTitle,
             requestIsEnabled: requestIsEnabled,
+            loginLaunchTitle: localization.text("menu.launch_at_login"),
+            loginLaunchIsEnabled: loginLaunchState == .enabled,
             systemLanguageIsSelected: language == .system,
             englishLanguageIsSelected: language == .english,
             simplifiedChineseLanguageIsSelected: language == .simplifiedChinese
@@ -326,10 +334,6 @@ final class StatusMenuController: NSObject {
         onSelectLanguage?(.simplifiedChinese)
     }
 
-    @objc private func openLoginSettingsSelected() {
-        onOpenLoginSettings?()
-    }
-
     @objc private func quitSelected() {
         NSApp.terminate(nil)
     }
@@ -383,8 +387,8 @@ final class StatusMenuController: NSObject {
                 self?.simplifiedChineseLanguageSelected()
             }
         }
-        menuView.onOpenLoginSettings = { [weak self] in
-            self?.openLoginSettingsSelected()
+        menuView.onSetLoginLaunchEnabled = { [weak self] isEnabled in
+            self?.onSetLoginLaunchEnabled?(isEnabled)
         }
         menuView.onQuit = { [weak self] in self?.quitSelected() }
     }
@@ -591,14 +595,8 @@ final class StatusMenuController: NSObject {
                 localization.text("menu.language_english_compact"),
                 localization.text("menu.language_simplified_chinese_compact")
             ],
-            loginStatusTitle: localization.text(
-                loginLaunchState == .disabled
-                    ? "menu.login_disabled"
-                    : "menu.login_enabled"
-            ),
-            openLoginSettingsTitle: localization.text(
-                "menu.open_login_settings_compact"
-            ),
+            loginLaunchTitle: localization.text("menu.launch_at_login"),
+            loginLaunchIsEnabled: loginLaunchState == .enabled,
             quitTitle: localization.text("menu.quit")
         )
     }
@@ -637,7 +635,7 @@ final class StatusMenuController: NSObject {
 
 enum UsageMenuMetrics {
     static let width: CGFloat = 300
-    static let height: CGFloat = 414
+    static let height: CGFloat = 378
     static let componentInset: CGFloat = 12
     static let componentWidth = width - componentInset * 2
 }
@@ -676,12 +674,10 @@ private final class UsageMenuView: NSView {
     private let languageControl = LanguageSegmentedControl(
         labels: ["System", "EN", "简中"]
     )
-    private let loginDisabledButton = UsageMenuView.rowButton(
+    private let loginLaunchLabel = UsageMenuView.rowButton(
         symbolName: "lock"
     )
-    private let loginSettingsButton = UsageMenuView.rowButton(
-        symbolName: "gearshape"
-    )
+    private let loginLaunchSwitch = NSSwitch(frame: .zero)
     private let quitButton = NSButton(title: "", target: nil, action: nil)
     private let shortcutLabel = UsageMenuView.label(
         font: .systemFont(ofSize: 12.3, weight: .regular),
@@ -692,7 +688,7 @@ private final class UsageMenuView: NSView {
     var onRefresh: (() -> Void)?
     var onRequest: (() -> Void)?
     var onSelectLanguage: ((AppLanguage) -> Void)?
-    var onOpenLoginSettings: (() -> Void)?
+    var onSetLoginLaunchEnabled: ((Bool) -> Void)?
     var onQuit: (() -> Void)?
 
     private var dynamicTextLabels: [HoverExpansionTextField] {
@@ -723,6 +719,11 @@ private final class UsageMenuView: NSView {
 
     func dismissHoverExpansion() {
         hoverExpansionPresenter.hide()
+    }
+
+    func simulateLoginLaunchToggleForTesting(isEnabled: Bool) {
+        loginLaunchSwitch.state = isEnabled ? .on : .off
+        loginLaunchSwitchChanged()
     }
 
     override var isFlipped: Bool { true }
@@ -780,8 +781,8 @@ private final class UsageMenuView: NSView {
         requestIsEnabled: Bool,
         language: AppLanguage,
         languageTitles: [String],
-        loginStatusTitle: String,
-        openLoginSettingsTitle: String,
+        loginLaunchTitle: String,
+        loginLaunchIsEnabled: Bool,
         quitTitle: String
     ) {
         gaugeView.remainingPercent = remainingPercent
@@ -812,8 +813,8 @@ private final class UsageMenuView: NSView {
             languageControl.selectedSegment = 2
         }
 
-        loginDisabledButton.title = loginStatusTitle
-        loginSettingsButton.title = openLoginSettingsTitle
+        loginLaunchLabel.title = loginLaunchTitle
+        loginLaunchSwitch.state = loginLaunchIsEnabled ? .on : .off
         quitButton.title = quitTitle
     }
 
@@ -879,8 +880,8 @@ private final class UsageMenuView: NSView {
             refreshButton,
             requestButton,
             languageControl,
-            loginDisabledButton,
-            loginSettingsButton,
+            loginLaunchLabel,
+            loginLaunchSwitch,
             quitButton,
             shortcutLabel
         ].forEach(addSubview)
@@ -915,11 +916,12 @@ private final class UsageMenuView: NSView {
         languageControl.target = self
         languageControl.action = #selector(languageSelected)
 
-        loginDisabledButton.frame = NSRect(x: 21, y: 288, width: 258, height: 32)
-        loginDisabledButton.isInformational = true
-        loginSettingsButton.frame = NSRect(x: 21, y: 324, width: 258, height: 32)
+        loginLaunchLabel.frame = NSRect(x: 21, y: 288, width: 205, height: 32)
+        loginLaunchLabel.isInformational = true
+        loginLaunchSwitch.frame = NSRect(x: 238, y: 293, width: 40, height: 22)
+        loginLaunchSwitch.controlSize = .small
 
-        quitButton.frame = NSRect(x: 20, y: 380, width: 212, height: 24)
+        quitButton.frame = NSRect(x: 20, y: 344, width: 212, height: 24)
         quitButton.isBordered = false
         quitButton.alignment = .left
         quitButton.font = .systemFont(ofSize: 13, weight: .regular)
@@ -929,7 +931,7 @@ private final class UsageMenuView: NSView {
         quitButton.keyEquivalent = "q"
         quitButton.keyEquivalentModifierMask = [.command]
 
-        shortcutLabel.frame = NSRect(x: 242, y: 381, width: 38, height: 22)
+        shortcutLabel.frame = NSRect(x: 242, y: 345, width: 38, height: 22)
         shortcutLabel.stringValue = "⌘ Q"
         shortcutLabel.alignment = .right
 
@@ -937,8 +939,8 @@ private final class UsageMenuView: NSView {
         refreshButton.action = #selector(refreshSelected)
         requestButton.target = self
         requestButton.action = #selector(requestSelected)
-        loginSettingsButton.target = self
-        loginSettingsButton.action = #selector(openLoginSettingsSelected)
+        loginLaunchSwitch.target = self
+        loginLaunchSwitch.action = #selector(loginLaunchSwitchChanged)
     }
 
     @objc private func refreshSelected() {
@@ -957,8 +959,8 @@ private final class UsageMenuView: NSView {
         onSelectLanguage?(languages[languageControl.selectedSegment])
     }
 
-    @objc private func openLoginSettingsSelected() {
-        onOpenLoginSettings?()
+    @objc private func loginLaunchSwitchChanged() {
+        onSetLoginLaunchEnabled?(loginLaunchSwitch.state == .on)
     }
 
     @objc private func quitSelected() {
@@ -1271,7 +1273,7 @@ private final class MenuGlassChromeView: NSView {
                 x: UsageMenuMetrics.componentInset,
                 y: 284,
                 width: UsageMenuMetrics.componentWidth,
-                height: 76
+                height: 40
             ),
             radius: 10,
             topAlpha: 0.034,
@@ -1299,10 +1301,6 @@ private final class MenuGlassChromeView: NSView {
         drawLine(
             from: NSPoint(x: bounds.midX, y: 196),
             to: NSPoint(x: bounds.midX, y: 220)
-        )
-        drawLine(
-            from: NSPoint(x: 21, y: 322),
-            to: NSPoint(x: bounds.width - 21, y: 322)
         )
     }
 
@@ -1582,7 +1580,7 @@ private final class MenuRowButton: NSButton {
             highlightPath.stroke()
         }
 
-        let tint = isInformational ? NSColor.secondaryLabelColor : NSColor.labelColor
+        let tint = NSColor.labelColor
         if let symbol {
             let imageRect = NSRect(x: 2, y: 4, width: 17, height: 17)
             symbol.draw(in: imageRect)

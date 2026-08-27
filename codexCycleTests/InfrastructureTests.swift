@@ -1,5 +1,6 @@
 import AppKit
 import Darwin
+import ServiceManagement
 import XCTest
 @testable import codexCycle
 
@@ -904,6 +905,8 @@ final class InfrastructureTests: XCTestCase {
             controller.presentationSnapshot.panelSummaryTitle,
             "5 小时余量 —   ·   5 小时重置 —"
         )
+        XCTAssertEqual(controller.presentationSnapshot.loginLaunchTitle, "登录时启动")
+        XCTAssertFalse(controller.presentationSnapshot.loginLaunchIsEnabled)
 
         let image = try XCTUnwrap(controller.renderedMenuImage())
         let data = try XCTUnwrap(image.tiffRepresentation)
@@ -912,7 +915,7 @@ final class InfrastructureTests: XCTestCase {
             representation.representation(using: .png, properties: [:])
         )
 
-        XCTAssertEqual(image.size, NSSize(width: 300, height: 414))
+        XCTAssertEqual(image.size, NSSize(width: 300, height: 378))
         let attachment = XCTAttachment(
             data: pngData,
             uniformTypeIdentifier: "public.png"
@@ -920,6 +923,13 @@ final class InfrastructureTests: XCTestCase {
         attachment.name = "Compact usage panel"
         attachment.lifetime = .keepAlways
         add(attachment)
+
+        var requestedLoginLaunchState: Bool?
+        controller.onSetLoginLaunchEnabled = {
+            requestedLoginLaunchState = $0
+        }
+        controller.simulateLoginLaunchToggleForTesting(isEnabled: true)
+        XCTAssertEqual(requestedLoginLaunchState, true)
     }
 
     @MainActor
@@ -927,7 +937,7 @@ final class InfrastructureTests: XCTestCase {
         let controller = StatusMenuController(language: .simplifiedChinese)
         let panel = controller.panelLayoutSnapshot
 
-        XCTAssertEqual(panel.contentSize, NSSize(width: 300, height: 414))
+        XCTAssertEqual(panel.contentSize, NSSize(width: 300, height: 378))
         XCTAssertTrue(panel.styleMask.contains(.borderless))
         XCTAssertTrue(panel.styleMask.contains(.nonactivatingPanel))
         XCTAssertEqual(panel.level, .popUpMenu)
@@ -951,6 +961,25 @@ final class InfrastructureTests: XCTestCase {
             controller.panelLayoutSnapshot.isVisible,
             "Opening from the status item must not immediately dismiss the panel"
         )
+    }
+
+    func testLoginItemManagerTogglesMainAppWithoutOpeningSystemSettings() throws {
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)")
+        )
+        let preferences = AppPreferences(defaults: defaults)
+        let service = FakeLoginItemService(status: .notRegistered)
+        let manager = LoginItemManager(
+            preferences: preferences,
+            service: service
+        )
+
+        XCTAssertEqual(manager.state, .disabled)
+        XCTAssertEqual(manager.setEnabled(true), .enabled)
+        XCTAssertEqual(service.registerCallCount, 1)
+        XCTAssertEqual(manager.setEnabled(false), .disabled)
+        XCTAssertEqual(service.unregisterCallCount, 1)
+        XCTAssertTrue(preferences.attemptedLoginRegistration)
     }
 
     private func localization(for identifier: String) throws -> AppLocalization {
@@ -989,6 +1018,26 @@ final class InfrastructureTests: XCTestCase {
         wait(for: [rejected], timeout: 5)
     }
 
+}
+
+private final class FakeLoginItemService: LoginItemServicing {
+    var status: SMAppService.Status
+    private(set) var registerCallCount = 0
+    private(set) var unregisterCallCount = 0
+
+    init(status: SMAppService.Status) {
+        self.status = status
+    }
+
+    func register() throws {
+        registerCallCount += 1
+        status = .enabled
+    }
+
+    func unregister() throws {
+        unregisterCallCount += 1
+        status = .notRegistered
+    }
 }
 
 private final class RuntimeDiscoveryFixture {

@@ -15,9 +15,7 @@
 "menu.language_system" = "Follow System";
 "menu.language_english" = "English";
 "menu.language_simplified_chinese" = "简体中文";
-"menu.login_disabled" = "Launch at Login Disabled";
-"menu.login_enabled" = "Launch at Login Enabled";
-"menu.open_login_settings" = "Open Login Items Settings…";
+"menu.launch_at_login" = "Launch at Login";
 "menu.quit" = "Quit codexCycle";
 "menu.usage" = "Usage";
 "menu.reset_compact" = "Resets in %@";
@@ -33,7 +31,6 @@
 "menu.language_system_compact" = "System";
 "menu.language_english_compact" = "EN";
 "menu.language_simplified_chinese_compact" = "简中";
-"menu.open_login_settings_compact" = "Login Items Settings…";
 
 "relative.less_than_one_minute" = "less than 1 minute";
 "relative.just_now" = "just now";
