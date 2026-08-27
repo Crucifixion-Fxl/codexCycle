@@ -85,6 +85,11 @@ struct StatusPanelLayoutSnapshot {
     let isVisible: Bool
 }
 
+struct HoverExpansionSnapshot {
+    let isVisible: Bool
+    let text: String?
+}
+
 struct StatusMenuPresentationSnapshot {
     let indicatorRemainingPercent: Int?
     let panelRemainingPercent: Int?
@@ -177,8 +182,16 @@ final class StatusMenuController: NSObject {
 
     var hasTruncatedDynamicText: Bool { menuView.hasTruncatedDynamicText }
 
-    var expansionTooltipsAreCorrect: Bool {
-        menuView.expansionTooltipsAreCorrect
+    var hoverExpansionSnapshot: HoverExpansionSnapshot {
+        menuView.hoverExpansionSnapshot
+    }
+
+    func simulateQuotaSummaryHoverForTesting() {
+        menuView.simulateQuotaSummaryHoverForTesting()
+    }
+
+    func simulateQuotaSummaryExitForTesting() {
+        menuView.simulateQuotaSummaryExitForTesting()
     }
 
     func renderedMenuImage() -> NSImage? {
@@ -322,7 +335,7 @@ final class StatusMenuController: NSObject {
     }
 
     @objc private func togglePanel() {
-        panel.isVisible ? panel.orderOut(nil) : showPanel()
+        panel.isVisible ? hidePanel() : showPanel()
     }
 
     private func configureStatusItem() {
@@ -382,6 +395,11 @@ final class StatusMenuController: NSObject {
         panel.orderFrontRegardless()
     }
 
+    private func hidePanel() {
+        menuView.dismissHoverExpansion()
+        panel.orderOut(nil)
+    }
+
     private func installClickOutsideMonitors() {
         let mouseEvents: NSEvent.EventTypeMask = [
             .leftMouseDown,
@@ -410,7 +428,7 @@ final class StatusMenuController: NSObject {
         let pointer = NSEvent.mouseLocation
         guard !panel.frame.contains(pointer) else { return }
         guard !statusItemFrameOnScreen().contains(pointer) else { return }
-        panel.orderOut(nil)
+        hidePanel()
     }
 
     private func statusItemFrameOnScreen() -> NSRect {
@@ -669,6 +687,7 @@ private final class UsageMenuView: NSView {
         font: .systemFont(ofSize: 12.3, weight: .regular),
         color: .tertiaryLabelColor
     )
+    private let hoverExpansionPresenter = HoverExpansionPresenter()
 
     var onRefresh: (() -> Void)?
     var onRequest: (() -> Void)?
@@ -676,7 +695,7 @@ private final class UsageMenuView: NSView {
     var onOpenLoginSettings: (() -> Void)?
     var onQuit: (() -> Void)?
 
-    private var dynamicTextLabels: [NSTextField] {
+    private var dynamicTextLabels: [HoverExpansionTextField] {
         [
             quotaTitleLabel,
             resetLabel,
@@ -690,12 +709,20 @@ private final class UsageMenuView: NSView {
         dynamicTextLabels.contains(where: isTruncated)
     }
 
-    var expansionTooltipsAreCorrect: Bool {
-        dynamicTextLabels.allSatisfy { label in
-            isTruncated(label)
-                ? label.toolTip == label.stringValue
-                : label.toolTip == nil
-        }
+    var hoverExpansionSnapshot: HoverExpansionSnapshot {
+        hoverExpansionPresenter.snapshot
+    }
+
+    func simulateQuotaSummaryHoverForTesting() {
+        quotaSummaryLabel.simulateMouseEnteredForTesting()
+    }
+
+    func simulateQuotaSummaryExitForTesting() {
+        quotaSummaryLabel.simulateMouseExitedForTesting()
+    }
+
+    func dismissHoverExpansion() {
+        hoverExpansionPresenter.hide()
     }
 
     override var isFlipped: Bool { true }
@@ -765,7 +792,7 @@ private final class UsageMenuView: NSView {
         updatedLabel.stringValue = updatedTitle
         errorLabel.stringValue = errorTitle ?? ""
         errorLabel.isHidden = errorTitle == nil
-        updateExpansionTooltips()
+        updateHoverExpansionText()
 
         refreshButton.title = refreshTitle
         refreshButton.isEnabled = refreshIsEnabled
@@ -818,13 +845,18 @@ private final class UsageMenuView: NSView {
         requestButton.contentTintColor = tintColor
     }
 
-    private func updateExpansionTooltips() {
+    private func updateHoverExpansionText() {
+        hoverExpansionPresenter.hide()
         for label in dynamicTextLabels {
             guard !label.isHidden else {
                 label.toolTip = nil
+                label.hoverExpansionText = nil
                 continue
             }
-            label.toolTip = isTruncated(label) ? label.stringValue : nil
+            label.toolTip = nil
+            label.hoverExpansionText = isTruncated(label)
+                ? label.stringValue
+                : nil
         }
     }
 
@@ -852,6 +884,17 @@ private final class UsageMenuView: NSView {
             quitButton,
             shortcutLabel
         ].forEach(addSubview)
+
+        for label in dynamicTextLabels {
+            label.onHoverChanged = { [weak self, weak label] isHovering in
+                guard let self, let label else { return }
+                guard isHovering, let text = label.hoverExpansionText else {
+                    self.hoverExpansionPresenter.hide()
+                    return
+                }
+                self.hoverExpansionPresenter.show(text: text, from: label)
+            }
+        }
 
         gaugeView.frame = NSRect(x: 23, y: 36, width: 82, height: 82)
         quotaTitleLabel.frame = NSRect(x: 116, y: 40, width: 161, height: 24)
@@ -960,8 +1003,11 @@ private final class UsageMenuView: NSView {
         }
     }
 
-    private static func label(font: NSFont, color: NSColor) -> NSTextField {
-        let field = NSTextField(labelWithString: "")
+    private static func label(
+        font: NSFont,
+        color: NSColor
+    ) -> HoverExpansionTextField {
+        let field = HoverExpansionTextField(labelWithString: "")
         field.font = font
         field.textColor = color
         field.lineBreakMode = .byTruncatingTail
@@ -997,6 +1043,161 @@ private final class UsageMenuView: NSView {
 
     private static func rowButton(symbolName: String) -> MenuRowButton {
         MenuRowButton(symbolName: symbolName)
+    }
+}
+
+private final class HoverExpansionTextField: NSTextField {
+    var hoverExpansionText: String?
+    var onHoverChanged: ((Bool) -> Void)?
+
+    private var hoverTrackingArea: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard hoverExpansionText != nil else { return }
+        onHoverChanged?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        onHoverChanged?(false)
+    }
+
+    func simulateMouseEnteredForTesting() {
+        guard hoverExpansionText != nil else { return }
+        onHoverChanged?(true)
+    }
+
+    func simulateMouseExitedForTesting() {
+        onHoverChanged?(false)
+    }
+}
+
+private final class HoverExpansionPresenter {
+    private let panel: NSPanel
+    private let bubbleView = NSView()
+    private let textLabel = NSTextField(labelWithString: "")
+    private weak var parentWindow: NSWindow?
+    private var presentedText: String?
+
+    var snapshot: HoverExpansionSnapshot {
+        HoverExpansionSnapshot(
+            isVisible: panel.isVisible,
+            text: presentedText
+        )
+    }
+
+    init() {
+        panel = NSPanel(
+            contentRect: .zero,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.hidesOnDeactivate = false
+        panel.ignoresMouseEvents = true
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.level = NSWindow.Level(
+            rawValue: NSWindow.Level.popUpMenu.rawValue + 1
+        )
+        panel.collectionBehavior = [
+            .canJoinAllSpaces,
+            .fullScreenAuxiliary,
+            .transient
+        ]
+
+        bubbleView.wantsLayer = true
+        bubbleView.layer?.cornerRadius = 7
+        bubbleView.layer?.backgroundColor = NSColor(
+            calibratedWhite: 0.10,
+            alpha: 0.98
+        ).cgColor
+        bubbleView.layer?.borderColor = NSColor.white
+            .withAlphaComponent(0.18).cgColor
+        bubbleView.layer?.borderWidth = 0.75
+
+        textLabel.font = .systemFont(ofSize: 12.5, weight: .regular)
+        textLabel.textColor = .white
+        textLabel.lineBreakMode = .byClipping
+        textLabel.maximumNumberOfLines = 1
+        bubbleView.addSubview(textLabel)
+        panel.contentView = bubbleView
+    }
+
+    deinit {
+        hide()
+    }
+
+    func show(text: String, from sourceView: NSView) {
+        presentedText = text
+        textLabel.stringValue = text
+
+        let textSize = textLabel.attributedStringValue.size()
+        let panelSize = NSSize(
+            width: ceil(textSize.width) + 24,
+            height: 30
+        )
+        bubbleView.frame = NSRect(origin: .zero, size: panelSize)
+        textLabel.frame = NSRect(
+            x: 12,
+            y: 6,
+            width: ceil(textSize.width),
+            height: 18
+        )
+        panel.setContentSize(panelSize)
+
+        guard let sourceWindow = sourceView.window else { return }
+        let sourceFrame = sourceWindow.convertToScreen(
+            sourceView.convert(sourceView.bounds, to: nil)
+        )
+        let visibleFrame = sourceWindow.screen?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? sourceFrame
+        let minimumX = visibleFrame.minX + 8
+        let maximumX = visibleFrame.maxX - panelSize.width - 8
+        let centeredX = sourceFrame.midX - panelSize.width / 2
+        let originX = min(max(centeredX, minimumX), maximumX)
+        var originY = sourceFrame.minY - panelSize.height - 6
+        if originY < visibleFrame.minY + 8 {
+            originY = sourceFrame.maxY + 6
+        }
+
+        if parentWindow !== sourceWindow {
+            if let parentWindow {
+                parentWindow.removeChildWindow(panel)
+            }
+            sourceWindow.addChildWindow(panel, ordered: .above)
+            parentWindow = sourceWindow
+        }
+        panel.setFrameOrigin(NSPoint(x: originX, y: originY))
+        panel.orderFrontRegardless()
+    }
+
+    func hide() {
+        presentedText = nil
+        if let parentWindow {
+            parentWindow.removeChildWindow(panel)
+        }
+        parentWindow = nil
+        panel.orderOut(nil)
     }
 }
 
