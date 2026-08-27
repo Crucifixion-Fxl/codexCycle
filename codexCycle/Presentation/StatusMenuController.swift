@@ -192,6 +192,10 @@ final class StatusMenuController: NSObject {
         menuView.loginLaunchSwitchTrackColor
     }
 
+    var loginLaunchSwitchPosition: CGFloat {
+        menuView.loginLaunchSwitchPosition
+    }
+
     func simulateQuotaSummaryHoverForTesting() {
         menuView.simulateQuotaSummaryHoverForTesting()
     }
@@ -200,8 +204,14 @@ final class StatusMenuController: NSObject {
         menuView.simulateQuotaSummaryExitForTesting()
     }
 
-    func simulateLoginLaunchToggleForTesting(isEnabled: Bool) {
-        menuView.simulateLoginLaunchToggleForTesting(isEnabled: isEnabled)
+    func simulateLoginLaunchToggleForTesting(
+        isEnabled: Bool,
+        reduceMotion: Bool? = nil
+    ) {
+        menuView.simulateLoginLaunchToggleForTesting(
+            isEnabled: isEnabled,
+            reduceMotion: reduceMotion
+        )
     }
 
     func renderedMenuImage() -> NSImage? {
@@ -717,6 +727,10 @@ private final class UsageMenuView: NSView {
         loginLaunchSwitch.trackColor
     }
 
+    var loginLaunchSwitchPosition: CGFloat {
+        loginLaunchSwitch.visualPosition
+    }
+
     func simulateQuotaSummaryHoverForTesting() {
         quotaSummaryLabel.simulateMouseEnteredForTesting()
     }
@@ -729,8 +743,15 @@ private final class UsageMenuView: NSView {
         hoverExpansionPresenter.hide()
     }
 
-    func simulateLoginLaunchToggleForTesting(isEnabled: Bool) {
-        loginLaunchSwitch.state = isEnabled ? .on : .off
+    func simulateLoginLaunchToggleForTesting(
+        isEnabled: Bool,
+        reduceMotion: Bool? = nil
+    ) {
+        loginLaunchSwitch.setState(
+            isEnabled ? .on : .off,
+            animated: true,
+            reduceMotion: reduceMotion
+        )
         loginLaunchSwitchChanged()
     }
 
@@ -822,7 +843,10 @@ private final class UsageMenuView: NSView {
         }
 
         loginLaunchLabel.title = loginLaunchTitle
-        loginLaunchSwitch.state = loginLaunchIsEnabled ? .on : .off
+        loginLaunchSwitch.setState(
+            loginLaunchIsEnabled ? .on : .off,
+            animated: false
+        )
         quitButton.title = quitTitle
     }
 
@@ -1057,7 +1081,9 @@ private final class UsageMenuView: NSView {
 }
 
 private final class GreenOnSwitch: NSControl {
-    var state: NSControl.StateValue = .off {
+    private(set) var state: NSControl.StateValue = .off
+
+    @objc dynamic private(set) var visualPosition: CGFloat = 0 {
         didSet { needsDisplay = true }
     }
 
@@ -1066,9 +1092,50 @@ private final class GreenOnSwitch: NSControl {
     }
 
     var trackColor: NSColor {
-        state == .on
-            ? .systemGreen
-            : NSColor.white.withAlphaComponent(0.18)
+        let offColor = NSColor.white.withAlphaComponent(0.18)
+        let progress = min(1, max(0, visualPosition))
+        if progress == 0 { return offColor }
+        if progress == 1 { return .systemGreen }
+        return offColor.blended(
+            withFraction: progress,
+            of: .systemGreen
+        ) ?? (progress < 0.5 ? offColor : .systemGreen)
+    }
+
+    override class func defaultAnimation(
+        forKey key: NSAnimatablePropertyKey
+    ) -> Any? {
+        if key == "visualPosition" {
+            return CABasicAnimation()
+        }
+        return super.defaultAnimation(forKey: key)
+    }
+
+    func setState(
+        _ newState: NSControl.StateValue,
+        animated: Bool,
+        reduceMotion: Bool? = nil
+    ) {
+        guard newState != state else { return }
+        state = newState
+        let targetPosition: CGFloat = newState == .on ? 1 : 0
+        let shouldReduceMotion = reduceMotion
+            ?? NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        guard animated, !shouldReduceMotion else {
+            visualPosition = targetPosition
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(
+                controlPoints: 0.22,
+                0.78,
+                0.24,
+                1
+            )
+            animator().visualPosition = targetPosition
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -1082,9 +1149,10 @@ private final class GreenOnSwitch: NSControl {
         trackPath.fill()
 
         let knobDiameter = trackRect.height - 4
-        let knobX = state == .on
-            ? trackRect.maxX - knobDiameter - 2
-            : trackRect.minX + 2
+        let knobStartX = trackRect.minX + 2
+        let knobEndX = trackRect.maxX - knobDiameter - 2
+        let knobX = knobStartX
+            + ((knobEndX - knobStartX) * visualPosition)
         let knobRect = NSRect(
             x: knobX,
             y: trackRect.midY - knobDiameter / 2,
@@ -1098,7 +1166,7 @@ private final class GreenOnSwitch: NSControl {
 
     override func mouseDown(with event: NSEvent) {
         guard isEnabled else { return }
-        state = state == .on ? .off : .on
+        setState(state == .on ? .off : .on, animated: true)
         sendAction(action, to: target)
     }
 
@@ -1116,7 +1184,7 @@ private final class GreenOnSwitch: NSControl {
 
     override func accessibilityPerformPress() -> Bool {
         guard isEnabled else { return false }
-        state = state == .on ? .off : .on
+        setState(state == .on ? .off : .on, animated: true)
         sendAction(action, to: target)
         return true
     }

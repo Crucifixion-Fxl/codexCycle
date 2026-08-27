@@ -123,7 +123,9 @@ If the selected plan window is unavailable, its value shows `—`.
 - Show one localized Launch at Login row with a switch. Toggling it registers or
   unregisters the main app directly and refreshes the switch from the effective
   `SMAppService` state without opening System Settings. The switch uses system
-  green while enabled and a neutral gray track while disabled.
+  green while enabled and a neutral gray track while disabled. User-initiated
+  changes slide the knob and blend the track color over a short eased transition;
+  Reduce Motion switches state immediately.
 - Refresh, request, and language-selection actions update the open panel in place;
   they do not dismiss it.
 - A Codex request progresses through localized requesting, success, or failure

@@ -935,8 +935,53 @@ final class InfrastructureTests: XCTestCase {
         controller.onSetLoginLaunchEnabled = {
             requestedLoginLaunchState = $0
         }
-        controller.simulateLoginLaunchToggleForTesting(isEnabled: false)
+        controller.simulateLoginLaunchToggleForTesting(
+            isEnabled: false,
+            reduceMotion: true
+        )
         XCTAssertEqual(requestedLoginLaunchState, false)
+    }
+
+    @MainActor
+    func testLoginLaunchSwitchSlidesAndRespectsReduceMotion() {
+        let controller = StatusMenuController(language: .english)
+        controller.update(
+            state: .unavailable(nil),
+            refreshing: false,
+            canRequest: true,
+            loginLaunchState: .disabled
+        )
+        var requestedLoginLaunchState: Bool?
+        controller.onSetLoginLaunchEnabled = {
+            requestedLoginLaunchState = $0
+        }
+
+        XCTAssertEqual(controller.loginLaunchSwitchPosition, 0)
+        controller.simulateLoginLaunchToggleForTesting(
+            isEnabled: true,
+            reduceMotion: false
+        )
+        XCTAssertEqual(requestedLoginLaunchState, true)
+
+        let animationDeadline = Date().addingTimeInterval(0.18)
+        var observedIntermediatePosition = false
+        while Date() < animationDeadline, !observedIntermediatePosition {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            let position = controller.loginLaunchSwitchPosition
+            observedIntermediatePosition = position > 0.01 && position < 0.99
+        }
+        XCTAssertTrue(observedIntermediatePosition)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.24))
+        XCTAssertEqual(controller.loginLaunchSwitchPosition, 1, accuracy: 0.01)
+        XCTAssertEqual(controller.loginLaunchSwitchTrackColor, .systemGreen)
+
+        controller.simulateLoginLaunchToggleForTesting(
+            isEnabled: false,
+            reduceMotion: true
+        )
+        XCTAssertEqual(requestedLoginLaunchState, false)
+        XCTAssertEqual(controller.loginLaunchSwitchPosition, 0)
     }
 
     @MainActor
