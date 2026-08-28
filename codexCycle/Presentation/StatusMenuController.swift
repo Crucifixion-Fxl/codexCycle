@@ -196,6 +196,8 @@ final class StatusMenuController: NSObject {
         menuView.loginLaunchSwitchPosition
     }
 
+    var gaugeAnimationIsActive: Bool { menuView.gaugeAnimationIsActive }
+
     func simulateQuotaSummaryHoverForTesting() {
         menuView.simulateQuotaSummaryHoverForTesting()
     }
@@ -329,11 +331,18 @@ final class StatusMenuController: NSObject {
     }
 
     @objc private func refreshSelected() {
-        onRefresh?()
+        // Let AppKit finish the current button-tracking event before the
+        // coordinator disables controls and redraws the panel.
+        DispatchQueue.main.async { [weak self] in
+            self?.onRefresh?()
+        }
     }
 
     @objc private func requestSelected() {
-        onRequest?()
+        // Request feedback performs the same loading-state redraw as refresh.
+        DispatchQueue.main.async { [weak self] in
+            self?.onRequest?()
+        }
     }
 
     @objc private func systemLanguageSelected() {
@@ -730,6 +739,8 @@ private final class UsageMenuView: NSView {
     var loginLaunchSwitchPosition: CGFloat {
         loginLaunchSwitch.visualPosition
     }
+
+    var gaugeAnimationIsActive: Bool { gaugeView.animationIsActive }
 
     func simulateQuotaSummaryHoverForTesting() {
         quotaSummaryLabel.simulateMouseEnteredForTesting()
@@ -1774,6 +1785,8 @@ private final class QuotaGaugeView: NSView {
     private var animationStartedAt = ProcessInfo.processInfo.systemUptime
     private var animationTimer: Timer?
     private weak var observedWindow: NSWindow?
+
+    var animationIsActive: Bool { animationTimer != nil }
 
     var remainingPercent: Int? {
         didSet {

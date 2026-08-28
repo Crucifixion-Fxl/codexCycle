@@ -872,6 +872,100 @@ final class InfrastructureTests: XCTestCase {
     }
 
     @MainActor
+    func testLoadingActionsDeferRedrawAndKeepOtherControlsInteractive() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let controller = StatusMenuController(language: .english)
+        let snapshot = QuotaUsageSnapshot(
+            fiveHour: QuotaUsageReading(
+                remainingPercent: 75,
+                resetsAt: now.addingTimeInterval(3_600),
+                fetchedAt: now
+            ),
+            weekly: nil
+        )
+
+        controller.update(
+            state: .fresh(snapshot),
+            refreshing: false,
+            canRequest: true,
+            loginLaunchState: .enabled,
+            now: now
+        )
+        controller.perform(NSSelectorFromString("togglePanel"))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        var refreshStarted = false
+        controller.onRefresh = {
+            refreshStarted = true
+            controller.update(
+                state: .fresh(snapshot),
+                refreshing: true,
+                canRequest: true,
+                loginLaunchState: .enabled,
+                now: now
+            )
+        }
+
+        controller.perform(NSSelectorFromString("refreshSelected"))
+        XCTAssertFalse(
+            refreshStarted,
+            "Do not mutate loading UI reentrantly inside AppKit button tracking"
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        XCTAssertTrue(refreshStarted)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        XCTAssertTrue(controller.gaugeAnimationIsActive)
+
+        var requestedLoginLaunchState: Bool?
+        controller.onSetLoginLaunchEnabled = {
+            requestedLoginLaunchState = $0
+        }
+        controller.simulateLoginLaunchToggleForTesting(
+            isEnabled: false,
+            reduceMotion: true
+        )
+        XCTAssertEqual(requestedLoginLaunchState, false)
+
+        controller.update(
+            state: .fresh(snapshot),
+            refreshing: false,
+            requestFeedback: .idle,
+            canRequest: true,
+            loginLaunchState: .enabled,
+            now: now
+        )
+        var requestStarted = false
+        controller.onRequest = {
+            requestStarted = true
+            controller.update(
+                state: .fresh(snapshot),
+                refreshing: false,
+                requestFeedback: .requesting,
+                canRequest: true,
+                loginLaunchState: .enabled,
+                now: now
+            )
+        }
+
+        controller.perform(NSSelectorFromString("requestSelected"))
+        XCTAssertFalse(
+            requestStarted,
+            "Do not mutate loading UI reentrantly inside AppKit button tracking"
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        XCTAssertTrue(requestStarted)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        XCTAssertTrue(controller.gaugeAnimationIsActive)
+
+        requestedLoginLaunchState = nil
+        controller.simulateLoginLaunchToggleForTesting(
+            isEnabled: true,
+            reduceMotion: true
+        )
+        XCTAssertEqual(requestedLoginLaunchState, true)
+    }
+
+    @MainActor
     func testLanguageSelectionSliderMovesToSelectedSegmentAndRespectsReduceMotion() {
         let control = LanguageSegmentedControl(labels: ["System", "EN", "简中"])
         control.frame = NSRect(x: 0, y: 0, width: 276, height: 32)
