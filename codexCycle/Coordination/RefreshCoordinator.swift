@@ -53,6 +53,8 @@ struct DailyCodexRequestSchedule {
 }
 
 final class RefreshCoordinator {
+    private var keepAwakeActivity: NSObjectProtocol?
+    private var keepAwakeEnabled = false
     private let service: CodexUsageService
     private let cache: QuotaUsageCaching
     private let menuController: StatusMenuController
@@ -112,7 +114,7 @@ final class RefreshCoordinator {
             self?.requestRefresh(trigger: .manual)
         }
         menuController.onRequest = { [weak self] in
-            self?.startManualCodexRequest()
+            self?.toggleKeepAwake()
         }
         menuController.onSelectLanguage = { [weak self] language in
             guard let self else { return }
@@ -144,6 +146,10 @@ final class RefreshCoordinator {
     }
 
     func stop() {
+        if let activity = keepAwakeActivity {
+            ProcessInfo.processInfo.endActivity(activity)
+            keepAwakeActivity = nil
+        }
         dispatchPrecondition(condition: .onQueue(.main))
         pollTimer?.invalidate()
         relativeTimer?.invalidate()
@@ -416,5 +422,20 @@ final class RefreshCoordinator {
             canRequest: service.canStartQuotaRefreshRequest,
             loginLaunchState: loginItemManager.state
         )
+    }
+
+    private func toggleKeepAwake() {
+        keepAwakeEnabled.toggle()
+        if keepAwakeEnabled {
+            keepAwakeActivity = ProcessInfo.processInfo.beginActivity(
+                options: [.idleSystemSleepDisabled],
+                reason: "codexCycle keep awake while lid is closed"
+            )
+        } else if let activity = keepAwakeActivity {
+            ProcessInfo.processInfo.endActivity(activity)
+            keepAwakeActivity = nil
+        }
+        menuController.setKeepAwakeEnabled(keepAwakeEnabled)
+        updatePresentation()
     }
 }

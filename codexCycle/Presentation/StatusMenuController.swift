@@ -143,6 +143,7 @@ final class StatusMenuController: NSObject {
     private var errorTitle: String?
     private var requestTitle = ""
     private var requestIsEnabled = false
+    private var keepAwakeEnabled = false
     private var panelRemainingPercent: Int?
     private var panelQuotaTitle = ""
     private var panelResetTitle = ""
@@ -162,6 +163,14 @@ final class StatusMenuController: NSObject {
     var onRequest: (() -> Void)?
     var onSelectLanguage: ((AppLanguage) -> Void)?
     var onSetLoginLaunchEnabled: ((Bool) -> Void)?
+
+    func setKeepAwakeEnabled(_ enabled: Bool) {
+        keepAwakeEnabled = enabled
+        keepAwakeSwitch.setState(enabled ? .on : .off, animated: false)
+        requestTitle = localization.text(enabled ? "menu.keep_awake_on" : "menu.keep_awake")
+        requestIsEnabled = true
+        markNeedsDisplay(menuView)
+    }
 
     var layoutSnapshot: StatusItemLayoutSnapshot {
         StatusItemLayoutSnapshot(
@@ -543,8 +552,8 @@ final class StatusMenuController: NSObject {
             errorTitle = nil
         }
 
-        requestTitle = localization.text(requestFeedback.titleKey)
-        requestIsEnabled = canRequest && !refreshing && requestFeedback == .idle
+        requestTitle = localization.text(keepAwakeEnabled ? "menu.keep_awake_on" : "menu.keep_awake")
+        requestIsEnabled = true
 
         let fiveHourReading = snapshot?.fiveHour
         let weeklyReading = snapshot?.weekly
@@ -609,7 +618,7 @@ final class StatusMenuController: NSObject {
                 refreshing ? "menu.refreshing_compact" : "menu.refresh_compact"
             ),
             refreshIsEnabled: !refreshing && !requestFeedback.isRequesting,
-            requestTitle: localization.text(requestFeedback.compactTitleKey),
+            requestTitle: localization.text(keepAwakeEnabled ? "menu.keep_awake_on" : "menu.keep_awake"),
             requestFeedback: requestFeedback,
             requestIsEnabled: requestIsEnabled,
             language: language,
@@ -694,6 +703,8 @@ private final class UsageMenuView: NSView {
     private let requestButton = UsageMenuView.actionButton(
         symbolName: "doc.badge.plus"
     )
+    private let keepAwakeSwitch = GreenOnSwitch(frame: .zero)
+    private let keepAwakeLabel = UsageMenuView.rowButton(symbolName: "moon.zzz")
     private let languageControl = LanguageSegmentedControl(
         labels: ["System", "EN", "简中"]
     )
@@ -839,6 +850,7 @@ private final class UsageMenuView: NSView {
         refreshButton.isEnabled = refreshIsEnabled
         requestButton.title = requestTitle
         requestButton.isEnabled = requestIsEnabled
+        keepAwakeSwitch.setState(keepAwakeEnabled ? .on : .off, animated: false)
         updateRequestButtonAppearance(for: requestFeedback)
 
         for (index, languageTitle) in languageTitles.prefix(3).enumerated() {
@@ -922,6 +934,8 @@ private final class UsageMenuView: NSView {
             errorLabel,
             refreshButton,
             requestButton,
+            keepAwakeSwitch,
+            keepAwakeLabel,
             languageControl,
             loginLaunchLabel,
             loginLaunchSwitch,
@@ -949,6 +963,13 @@ private final class UsageMenuView: NSView {
 
         refreshButton.frame = NSRect(x: 17, y: 192, width: 128, height: 32)
         requestButton.frame = NSRect(x: 155, y: 192, width: 128, height: 32)
+        requestButton.isHidden = true
+        keepAwakeSwitch.frame = NSRect(x: 238, y: 197, width: 40, height: 22)
+        keepAwakeLabel.frame = NSRect(x: 21, y: 192, width: 205, height: 32)
+        keepAwakeLabel.title = localization.text("menu.keep_awake")
+        keepAwakeLabel.isInformational = true
+        keepAwakeSwitch.target = self
+        keepAwakeSwitch.action = #selector(requestSelected)
 
         languageControl.frame = NSRect(
             x: UsageMenuMetrics.componentInset,

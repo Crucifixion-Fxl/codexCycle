@@ -28,6 +28,8 @@
 "menu.requesting_compact" = "请求中…";
 "menu.request_succeeded_compact" = "请求成功";
 "menu.request_failed_compact" = "请求失败";
+"menu.keep_awake" = "合盖继续运行";
+"menu.keep_awake_on" = "合盖继续运行：已开启";
 "menu.language_system_compact" = "系统";
 "menu.language_english_compact" = "EN";
 "menu.language_simplified_chinese_compact" = "简中";

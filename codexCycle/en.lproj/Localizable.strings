@@ -28,6 +28,8 @@
 "menu.requesting_compact" = "Requesting…";
 "menu.request_succeeded_compact" = "Succeeded";
 "menu.request_failed_compact" = "Failed";
+"menu.keep_awake" = "Keep Awake (Lid Closed)";
+"menu.keep_awake_on" = "Keep Awake: On";
 "menu.language_system_compact" = "System";
 "menu.language_english_compact" = "EN";
 "menu.language_simplified_chinese_compact" = "简中";
