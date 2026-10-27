@@ -94,7 +94,7 @@ work.
 ## Runtime and privacy
 
 `codexCycle` discovers a compatible local Runtime and communicates with
-`codex app-server --stdio`. It reads `account/rateLimits/read` and listens for
+`codex app-server`. It reads `account/rateLimits/read` and listens for
 rate-limit update notifications. The app validates Runtime ownership,
 permissions, executable shape, and code signatures before launch.
 

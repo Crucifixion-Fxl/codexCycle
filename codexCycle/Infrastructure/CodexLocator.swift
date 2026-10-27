@@ -307,6 +307,13 @@ final class CodexLocator {
         }
     }
 
+    // Current desktop builds embed a signed CLI app; older builds ship a
+    // single executable. Launch the native binary, never the shell wrapper.
+    private static let desktopExecutablePaths = [
+        "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+        "Contents/Resources/codex"
+    ]
+
     private struct RuntimeLocation {
         let executableURL: URL
         let source: CodexRuntimeSource
@@ -391,8 +398,8 @@ final class CodexLocator {
             .map(String.init)
             .forEach {
                 result.append(
-                    independentLocation(
-                        at: URL(fileURLWithPath: $0).appendingPathComponent("codex")
+                    runtimeLocation(
+                        forExecutablePath: URL(fileURLWithPath: $0).appendingPathComponent("codex").path
                     )
                 )
             }
@@ -409,7 +416,7 @@ final class CodexLocator {
         ]
         result.append(
             contentsOf: fixedPaths.map {
-                independentLocation(at: URL(fileURLWithPath: $0))
+                runtimeLocation(forExecutablePath: $0)
             }
         )
 
@@ -421,8 +428,8 @@ final class CodexLocator {
         ) {
             versions.forEach {
                 result.append(
-                    independentLocation(
-                        at: $0.appendingPathComponent("bin/codex")
+                    runtimeLocation(
+                        forExecutablePath: $0.appendingPathComponent("bin/codex").path
                     )
                 )
             }
@@ -430,8 +437,8 @@ final class CodexLocator {
 
         for directory in environment.applicationDirectories {
             result.append(
-                contentsOf: SupportedDesktopRuntime.allCases.map {
-                    desktopLocation(in: directory, desktop: $0)
+                contentsOf: SupportedDesktopRuntime.allCases.flatMap {
+                    desktopLocations(in: directory, desktop: $0)
                 }
             )
         }
@@ -443,38 +450,37 @@ final class CodexLocator {
         let executables = environment.spotlightExecutablePaths().map {
             runtimeLocation(forExecutablePath: $0)
         }
-        let applications = environment.spotlightApplicationPaths().compactMap {
-            desktopLocation(forApplicationPath: $0)
+        let applications = environment.spotlightApplicationPaths().flatMap {
+            desktopLocations(forApplicationPath: $0)
         }
         return executables + applications
     }
 
-    private func desktopLocation(
+    private func desktopLocations(
         in directory: URL,
         desktop: SupportedDesktopRuntime
-    ) -> RuntimeLocation {
+    ) -> [RuntimeLocation] {
         let applicationURL = directory.appendingPathComponent(
             desktop.applicationName,
             isDirectory: true
         )
-        return RuntimeLocation(
-            executableURL: applicationURL
-                .appendingPathComponent("Contents/Resources/codex"),
-            source: desktop.source,
-            applicationURL: applicationURL
-        )
+        return Self.desktopExecutablePaths.map { relativePath in
+            RuntimeLocation(
+                executableURL: applicationURL.appendingPathComponent(relativePath),
+                source: desktop.source,
+                applicationURL: applicationURL
+            )
+        }
     }
 
-    private func desktopLocation(forApplicationPath path: String) -> RuntimeLocation? {
+    private func desktopLocations(forApplicationPath path: String) -> [RuntimeLocation] {
         let applicationURL = URL(fileURLWithPath: path, isDirectory: true)
-        guard
-            let desktop = SupportedDesktopRuntime(
-                applicationName: applicationURL.lastPathComponent
-            )
-        else {
-            return nil
+        guard let desktop = SupportedDesktopRuntime(
+            applicationName: applicationURL.lastPathComponent
+        ) else {
+            return []
         }
-        return desktopLocation(
+        return desktopLocations(
             in: applicationURL.deletingLastPathComponent(),
             desktop: desktop
         )
@@ -482,30 +488,22 @@ final class CodexLocator {
 
     private func runtimeLocation(forExecutablePath path: String) -> RuntimeLocation {
         let executableURL = URL(fileURLWithPath: path)
-        let suffix = "/Contents/Resources/codex"
-        guard executableURL.path.hasSuffix(suffix) else {
-            return independentLocation(at: executableURL)
-        }
-
-        let applicationPath = String(executableURL.path.dropLast(suffix.count))
-        let applicationURL = URL(fileURLWithPath: applicationPath, isDirectory: true)
-        guard
-            let desktop = SupportedDesktopRuntime(
+        let resolvedURL = executableURL.resolvingSymlinksInPath().standardizedFileURL
+        for relativePath in Self.desktopExecutablePaths {
+            let suffix = "/" + relativePath
+            guard resolvedURL.path.hasSuffix(suffix) else { continue }
+            let applicationPath = String(resolvedURL.path.dropLast(suffix.count))
+            let applicationURL = URL(fileURLWithPath: applicationPath, isDirectory: true)
+            guard let desktop = SupportedDesktopRuntime(
                 applicationName: applicationURL.lastPathComponent
+            ) else { continue }
+            return RuntimeLocation(
+                executableURL: executableURL,
+                source: desktop.source,
+                applicationURL: applicationURL
             )
-        else {
-            return independentLocation(at: executableURL)
         }
-
         return RuntimeLocation(
-            executableURL: executableURL,
-            source: desktop.source,
-            applicationURL: applicationURL
-        )
-    }
-
-    private func independentLocation(at executableURL: URL) -> RuntimeLocation {
-        RuntimeLocation(
             executableURL: executableURL,
             source: .independentCLI,
             applicationURL: nil

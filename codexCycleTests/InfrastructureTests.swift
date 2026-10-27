@@ -77,6 +77,116 @@ final class InfrastructureTests: XCTestCase {
         wait(for: [discovered], timeout: 5)
     }
 
+    func testDiscoversNestedDesktopRuntimeFromCachedPath() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+        let executableURL = try fixture.makeDesktopRuntime(
+            appName: "ChatGPT.app",
+            bundleIdentifier: "com.openai.codex",
+            version: "0.163.0-alpha.10.2",
+            relativeExecutablePath: "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        )
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)"))
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.selectedCodexPath = executableURL.path
+        let locator = CodexLocator(preferences: preferences, environment: fixture.environment)
+        let discovered = expectation(description: "Nested Desktop Runtime discovered")
+        locator.discover { result in
+            do {
+                let candidates = try result.get()
+                XCTAssertEqual(candidates.map(\.executableURL), [executableURL])
+                XCTAssertEqual(candidates.first?.source, .currentDesktop)
+            } catch {
+                XCTFail("Unexpected discovery error: \(error)")
+            }
+            discovered.fulfill()
+        }
+        wait(for: [discovered], timeout: 5)
+    }
+
+    func testDiscoversNestedDesktopRuntimeWithoutCachedPath() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+        let executableURL = try fixture.makeDesktopRuntime(
+            appName: "ChatGPT.app",
+            bundleIdentifier: "com.openai.codex",
+            version: "0.163.0",
+            relativeExecutablePath: "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        )
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)"))
+        let locator = CodexLocator(preferences: AppPreferences(defaults: defaults), environment: fixture.environment)
+        let discovered = expectation(description: "Nested Desktop Runtime found at startup")
+        locator.discover { result in
+            do {
+                let candidates = try result.get()
+                XCTAssertEqual(candidates.map(\.executableURL), [executableURL])
+                XCTAssertEqual(candidates.first?.source, .currentDesktop)
+            } catch {
+                XCTFail("Unexpected discovery error: \(error)")
+            }
+            discovered.fulfill()
+        }
+        wait(for: [discovered], timeout: 5)
+    }
+
+    func testRejectsNestedDesktopRuntimeWhenOuterApplicationSignatureIsInvalid() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+        _ = try fixture.makeDesktopRuntime(
+            appName: "ChatGPT.app",
+            bundleIdentifier: "com.openai.codex",
+            version: "0.163.0",
+            relativeExecutablePath: "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        )
+        fixture.rejectSignature(at: fixture.applicationsURL.appendingPathComponent("ChatGPT.app"))
+        try assertDesktopRuntimeIsRejected(fixture)
+    }
+
+    func testRejectsNestedDesktopRuntimeWhenExecutableSignatureIsInvalid() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+        let executableURL = try fixture.makeDesktopRuntime(
+            appName: "ChatGPT.app",
+            bundleIdentifier: "com.openai.codex",
+            version: "0.163.0",
+            relativeExecutablePath: "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        )
+        fixture.rejectSignature(at: executableURL)
+        try assertDesktopRuntimeIsRejected(fixture)
+    }
+
+    func testDesktopSymlinkOnPathCannotBypassApplicationSignatureCheck() throws {
+        let fixture = try RuntimeDiscoveryFixture()
+        defer { fixture.remove() }
+        let executableURL = try fixture.makeDesktopRuntime(
+            appName: "ChatGPT.app",
+            bundleIdentifier: "com.openai.codex",
+            version: "0.163.0",
+            relativeExecutablePath: "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
+        )
+        let binURL = fixture.rootURL.appendingPathComponent("bin")
+        try FileManager.default.createDirectory(at: binURL, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: binURL.appendingPathComponent("codex"), withDestinationURL: executableURL
+        )
+        fixture.rejectSignature(at: fixture.applicationsURL.appendingPathComponent("ChatGPT.app"))
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "InfrastructureTests.\(UUID().uuidString)"))
+        let locator = CodexLocator(
+            preferences: AppPreferences(defaults: defaults),
+            environment: fixture.makeEnvironment(executableSearchPath: binURL.path)
+        )
+        let rejected = expectation(description: "Desktop alias rejected with its application")
+        locator.discover { result in
+            guard case .failure(CodexLocatorError.incompatible) = result else {
+                XCTFail("Expected incompatible Runtime, got \(result)")
+                rejected.fulfill()
+                return
+            }
+            rejected.fulfill()
+        }
+        wait(for: [rejected], timeout: 5)
+    }
+
     func testIndependentCLIIsPreferredOverNewerDesktopRuntime() throws {
         let fixture = try RuntimeDiscoveryFixture()
         defer { fixture.remove() }
@@ -1285,18 +1395,18 @@ private final class RuntimeDiscoveryFixture {
     func makeDesktopRuntime(
         appName: String,
         bundleIdentifier: String,
-        version: String
+        version: String,
+        relativeExecutablePath: String = "Contents/Resources/codex"
     ) throws -> URL {
         let appURL = applicationsURL.appendingPathComponent(appName)
         let contentsURL = appURL.appendingPathComponent("Contents")
-        let resourcesURL = contentsURL.appendingPathComponent("Resources")
-        let executableURL = resourcesURL.appendingPathComponent("codex")
+        let executableURL = appURL.appendingPathComponent(relativeExecutablePath)
 
         try FileManager.default.createDirectory(
-            at: resourcesURL,
+            at: executableURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        try "#!/bin/sh\n".write(to: executableURL, atomically: true, encoding: .utf8)
+        try Data([0xcf, 0xfa, 0xed, 0xfe]).write(to: executableURL)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o700],
             ofItemAtPath: executableURL.path

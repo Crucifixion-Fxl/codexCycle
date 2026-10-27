@@ -80,9 +80,13 @@ final class AppServerClientTests: XCTestCase {
         client.stop()
     }
 
-    func testCodexLaunchUsesCandidateSearchPathForEnvInterpreter() throws {
+    func testCodexLaunchUsesDefaultStdioAndCandidateSearchPath() throws {
         let fixture = try makeEnvironmentDependentScript(
             body: """
+            # Public Codex releases use stdio by default and reject --stdio.
+            if [ "$#" -ne 1 ] || [ "$1" != "app-server" ]; then
+              exit 2
+            fi
             while IFS= read -r line; do
               case "$line" in
                 *rateLimits*)

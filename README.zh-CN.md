@@ -89,7 +89,7 @@
 
 ## Runtime 与隐私
 
-`codexCycle` 会寻找兼容的本地 Runtime，并通过 `codex app-server --stdio`
+`codexCycle` 会寻找兼容的本地 Runtime，并通过 `codex app-server`
 通信。应用读取 `account/rateLimits/read`，同时监听限额更新通知。运行前会检查
 Runtime 的所有者、权限、可执行文件形式和代码签名。
 

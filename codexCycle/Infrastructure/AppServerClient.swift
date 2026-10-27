@@ -14,8 +14,9 @@ struct AppServerLaunchConfiguration {
             arguments: [
                 "PATH=\(executableSearchPath)",
                 executableURL.path,
-                "app-server",
-                "--stdio"
+                // Stdio is the default transport across public CLI and desktop
+                // builds. The --stdio alias is not accepted by public releases.
+                "app-server"
             ]
         )
     }
